@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="dashboard-top">
+    <div>
+        <span class="eyebrow">Админ-панель</span>
+        <h2>{{ user.full_name }}</h2>
+        <p>Контроль пользователей, статуса платформы и базовых параметров безопасности проекта.</p>
+    </div>
+</section>
+
+<section class="grid grid-3">
+    <article class="panel stat">
+        <span class="stat-label">Пользователи</span>
+        <strong>{{ users|length }}</strong>
+        <p>В системе уже есть админ и зарегистрированные владельцы объектов.</p>
+    </article>
+    <article class="panel stat">
+        <span class="stat-label">Frontend</span>
+        <strong>Онлайн</strong>
+        <p>Страницы входа, регистрации, подтверждения и кабинетов уже работают.</p>
+    </article>
+    <article class="panel stat">
+        <span class="stat-label">Интеграции</span>
+        <strong>TravelLine</strong>
+        <p>Подключение активно, данные бронирований используются для выдачи доступов.</p>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <span class="eyebrow">Контроль доступа</span>
+            <h3>Пользователи системы</h3>
+        </div>
+    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Имя</th>
+                <th>Email</th>
+                <th>Телефон</th>
+                <th>Роль</th>
+                <th>Подтверждён</th>
+                <th>Создан</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in users %}
+            <tr>
+                <td>{{ item.full_name }}</td>
+                <td>{{ item.email }}</td>
+                <td>{{ item.phone }}</td>
+                <td><span class="pill">{{ item.role }}</span></td>
+                <td>{{ item.is_verified }}</td>
+                <td>{{ item.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base_public.html" %}
+{% block content %}
+<section class="public-page">
+    <div class="page-intro">
+        <span class="eyebrow">Новости</span>
+        <h1>Ход разработки SmartLocker</h1>
+        <p>Здесь собраны текущие этапы и обновления проекта, чтобы публичная часть сайта сразу выглядела как живой продукт, а не как заглушка.</p>
+    </div>
+    <div class="news-timeline">
+        {% for item in news %}
+        <article class="timeline-card">
+            <div class="timeline-dot"></div>
+            <div>
+                <h3>{{ item.title }}</h3>
+                <p>{{ item.text }}</p>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

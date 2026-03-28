@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="dashboard-top">
+    <div>
+        <span class="eyebrow">Кабинет пользователя</span>
+        <h2>{{ user.full_name }}</h2>
+        <p>Здесь собирается защищённая схема доступа: аккаунт TravelLine, объекты, двери и автоматические доступы для гостей по найденным броням.</p>
+    </div>
+    <a class="btn primary" href="/objects">Управлять объектами</a>
+</section>
+
+<section class="grid grid-4">
+    <article class="panel stat">
+        <span class="stat-label">Домов</span>
+        <strong>{{ houses|length }}</strong>
+        <p>Постоянно хранятся в базе вместе со связью с владельцем.</p>
+    </article>
+    <article class="panel stat">
+        <span class="stat-label">Дверей</span>
+        <strong>{{ total_doors }}</strong>
+        <p>У каждой двери теперь есть стабильный уникальный идентификатор.</p>
+    </article>
+    <article class="panel stat">
+        <span class="stat-label">Броней</span>
+        <strong>{{ reservation_cards|length }}</strong>
+        <p>Синхронизированы из аккаунта пользователя в TravelLine.</p>
+    </article>
+    <article class="panel stat">
+        <span class="stat-label">Access Grants</span>
+        <strong>{{ access_grants|length }}</strong>
+        <p>Создаются автоматически, если бронь уже нашла свою дверь.</p>
+    </article>
+</section>
+
+<section class="grid dashboard-layout">
+    <article class="panel">
+        <div class="section-head">
+            <div>
+                <span class="eyebrow">PMS</span>
+                <h3>Подключение аккаунта TravelLine</h3>
+            </div>
+        </div>
+        <form method="post" action="/dashboard/travelline" class="form-grid compact-form">
+            <label>
+                <span>Client ID</span>
+                <input type="text" name="client_id" value="{{ travelline_form.client_id }}" placeholder="api_connection_xxx" required>
+            </label>
+            <label>
+                <span>Client Secret</span>
+                <input type="password" name="client_secret" placeholder="Введите secret заново при обновлении" required>
+            </label>
+            <label>
+                <span>Property ID (необязательно)</span>
+                <input type="text" name="property_ids" value="{{ travelline_form.property_ids }}" placeholder="Оставьте пустым, чтобы подтянуть автоматически">
+            </label>
+            <button class="btn primary" type="submit">Сохранить подключение</button>
+        </form>
+
+        {% if travelline_connection %}
+        <div class="mapping-card ok">
+            <strong>Подключение активно</strong>
+            <span>Client ID: {{ travelline_connection.client_id }}</span>
+            <span>Property IDs: {{ travelline_connection.property_ids }}</span>
+        </div>
+        {% else %}
+        <div class="empty-card">Пока не добавлены данные аккаунта TravelLine для этого пользователя.</div>
+        {% endif %}
+
+        {% if travelline_error %}
+        <div class="alert error">{{ travelline_error }}</div>
+        {% endif %}
+    </article>
+
+    <article class="panel">
+        <div class="section-head">
+            <div>
+                <span class="eyebrow">Объекты</span>
+                <h3>Схема Дом -> Дверь</h3>
+            </div>
+        </div>
+        <div class="overview-list">
+            {% for house in houses %}
+            <article class="overview-item">
+                <div class="overview-head">
+                    <strong>{{ house.name }}</strong>
+                    <span class="pill">{{ house.doors|length }} дверей</span>
+                </div>
+                <span>{{ house.address }}</span>
+                {% for door in house.doors %}
+                <span>Дверь: {{ door.name }} · ID: {{ door.door_uid }}</span>
+                {% endfor %}
+            </article>
+            {% else %}
+            <div class="empty-card">У вас ещё нет объектов. Добавьте первый дом на странице «Объекты».</div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <span class="eyebrow">TravelLine</span>
+            <h3>Брони и распределение по дверям</h3>
+        </div>
+    </div>
+    <div class="reservation-grid">
+        {% for item in reservation_cards %}
+        <article class="reservation-card">
+            <div class="reservation-top">
+                <strong>{{ item.reservation.external_id }}</strong>
+                <span class="pill">{{ item.reservation.status }}</span>
+            </div>
+            <p class="reservation-guest">{{ item.reservation.guest_name }}</p>
+            <div class="reservation-meta">
+                <span>Unit ID: {{ item.reservation.unit_external_id or "—" }}</span>
+                <span>Заезд: {{ item.reservation.check_in }}</span>
+                <span>Выезд: {{ item.reservation.check_out }}</span>
+            </div>
+            {% if item.mapping %}
+            <div class="mapping-card ok">
+                <strong>{{ item.mapping.house_name }}</strong>
+                <span>Дверь: {{ item.mapping.door_name }}</span>
+                <span>ID двери: {{ item.mapping.door_uid }}</span>
+                <span>Устройство: {{ item.mapping.lock_label }}</span>
+            </div>
+            {% else %}
+            <div class="mapping-card warn">
+                <strong>Нет привязки</strong>
+                <span>Для unit {{ item.reservation.unit_external_id or "—" }} ещё не выбрана дверь.</span>
+            </div>
+            {% endif %}
+        </article>
+        {% else %}
+        <div class="empty-card">Бронирования пока не найдены или ещё не синхронизированы.</div>
+        {% endfor %}
+    </div>
+</section>
+
+{% if access_grants %}
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <span class="eyebrow">Доступы</span>
+            <h3>Access Grants по найденным дверям</h3>
+        </div>
+    </div>
+    <div class="grant-grid">
+        {% for grant in access_grants %}
+        <article class="grant-card">
+            <div class="overview-head">
+                <strong>{{ grant.guest_name }}</strong>
+                <span class="pill">{{ grant.method }}</span>
+            </div>
+            <span>{{ grant.house_name }} / {{ grant.door_name }}</span>
+            <span>ID двери: {{ grant.door_uid }}</span>
+            <span>Бронь: {{ grant.reservation_external_id }}</span>
+            <span>С {{ grant.valid_from }}</span>
+            <span>До {{ grant.valid_to }}</span>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

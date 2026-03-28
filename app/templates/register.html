@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-screen">
+    <div class="auth-card wide">
+        <div class="panel-head">
+            <span class="eyebrow">Регистрация</span>
+            <h2>Создайте аккаунт владельца</h2>
+            <p>После регистрации вы сразу перейдёте на обязательное подтверждение email.</p>
+        </div>
+        {% if error %}
+        <div class="alert error">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/register" class="form-grid two-columns">
+            <label>
+                <span>ФИО</span>
+                <input type="text" name="full_name" value="{{ form.full_name }}" placeholder="Иван Петров" required>
+            </label>
+            <label>
+                <span>Телефон</span>
+                <input type="tel" name="phone" value="{{ form.phone }}" placeholder="+7 999 123-45-67" required>
+            </label>
+            <label>
+                <span>Email</span>
+                <input type="email" name="email" value="{{ form.email }}" placeholder="name@example.com" required>
+            </label>
+            <label>
+                <span>Дата рождения</span>
+                <input type="date" name="birth_date" value="{{ form.birth_date }}" required>
+            </label>
+            <label class="span-2">
+                <span>Пароль</span>
+                <div class="password-field">
+                    <input id="register-password" type="password" name="password" value="{{ form.password }}" placeholder="Минимум 8 символов" required>
+                    <button class="password-toggle" type="button" data-target="register-password" aria-label="Показать пароль">👁</button>
+                </div>
+            </label>
+            <button class="btn primary span-2" type="submit">Зарегистрироваться</button>
+        </form>
+        <div class="auth-links">
+            <a href="/login">У меня уже есть аккаунт</a>
+        </div>
+    </div>
+</section>
+<script src="/static/app.js"></script>
+{% endblock %}

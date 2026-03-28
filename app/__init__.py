@@ -1,0 +1,1 @@
+"""SmartLocker application package."""

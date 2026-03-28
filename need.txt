@@ -1,0 +1,12 @@
+$env:TRAVELLINE_CLIENT_ID="api_connection_05b98_43784a436c"
+$env:TRAVELLINE_CLIENT_SECRET="YNRIOUR9xfOHK80au1BV6n6dcmj4PhqL"
+$env:TRAVELLINE_PROPERTY_ID="64946"
+python -m uvicorn app.main:app --reload
+
+$env:SMTP_HOST="smtp.gmail.com"
+$env:SMTP_PORT="587"
+$env:SMTP_USERNAME="123.smartlocker@gmail.com"
+$env:SMTP_PASSWORD="dnfciqeuzxewjyzv"
+$env:SMTP_FROM_EMAIL="123.smartlocker@gmail.com"
+$env:SMTP_USE_TLS="true"
+python start.py
