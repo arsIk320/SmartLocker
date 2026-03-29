@@ -45,6 +45,8 @@ class Settings(BaseSettings):
 
     session_cookie_name: str = os.getenv("SESSION_COOKIE_NAME", "smartlocker_session")
     session_persist_days: int = int(os.getenv("SESSION_PERSIST_DAYS", "30"))
+    session_cookie_secure: bool = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    session_cookie_samesite: str = os.getenv("SESSION_COOKIE_SAMESITE", "lax")
     admin_email: str = os.getenv("ADMIN_EMAIL", "admin@smartlocker.local")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "Admin123!")
     data_encryption_key: str | None = os.getenv("DATA_ENCRYPTION_KEY")

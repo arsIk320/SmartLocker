@@ -91,3 +91,4 @@ PyInstaller will create `dist/SmartLockerDesktop.exe`.
 
 - This is an initial integration layer meant to validate TravelLine Read Reservation API connectivity and normalize reservation payloads.
 - Before production launch, we should add PostgreSQL models, migrations, access control, audit logging, webhook verification, token caching, and Russian personal-data compliance controls.
+- A free test deployment path is documented in [docs/free_hosting.md](D:\Documents\GitHub\SmartLocker\docs\free_hosting.md).

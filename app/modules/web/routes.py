@@ -198,7 +198,8 @@ async def login_submit(
         key=settings.session_cookie_name,
         value=auth_service.create_session_token(user),
         httponly=True,
-        samesite="lax",
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
         max_age=settings.session_persist_days * 24 * 60 * 60,
         expires=settings.session_persist_days * 24 * 60 * 60,
     )
@@ -303,7 +304,8 @@ async def verify_submit(
         key=settings.session_cookie_name,
         value=auth_service.create_session_token(user),
         httponly=True,
-        samesite="lax",
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
         max_age=settings.session_persist_days * 24 * 60 * 60,
         expires=settings.session_persist_days * 24 * 60 * 60,
     )
@@ -386,7 +388,11 @@ async def reset_password_submit(
 @router.get("/logout")
 async def logout(settings: Settings = Depends(get_settings)):
     response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
-    response.delete_cookie(settings.session_cookie_name)
+    response.delete_cookie(
+        settings.session_cookie_name,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
+    )
     return response
 
 
