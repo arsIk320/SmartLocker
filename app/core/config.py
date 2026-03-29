@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = int(os.getenv("PORT", "8000"))
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./smartlocker.db")
+    smartlocker_api_base_url: str | None = os.getenv("SMARTLOCKER_API_BASE_URL")
 
     # Local fallback only. Replace with a real secret in production.
     jwt_secret_key: str = os.getenv(

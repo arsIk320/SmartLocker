@@ -32,9 +32,11 @@ from PyQt6.QtCore import QUrl
 from app.core.config import get_settings
 from app.db import create_session_factory, init_db
 from app.modules.auth.service import AuthService
+from app.modules.auth.models import AuthUser
 from app.modules.locks.serial_service import SerialBoardInfo, SerialProvisioningService
 from app.modules.locks.service import LockDeviceService
 from app.modules.properties.service import PropertyService
+from app.services.api_client import SmartLockerApiClient
 from app.services.encryption import EncryptionService
 
 
@@ -114,11 +116,27 @@ class LoginWidget(QWidget):
 
     def _login(self) -> None:
         try:
-            user = self.window.auth_service.authenticate(
-                email=self.email_edit.text().strip(),
-                password=self.password_edit.text(),
-            )
-        except ValueError as exc:
+            if self.window.uses_remote_api:
+                payload = self.window.api_client.login(
+                    email=self.email_edit.text().strip(),
+                    password=self.password_edit.text(),
+                )
+                user_data = payload["user"]
+                user = AuthUser(
+                    email=str(user_data["email"]),
+                    full_name=str(user_data["full_name"]),
+                    phone_encrypted="",
+                    birth_date_encrypted="",
+                    password_hash="",
+                    role=str(user_data.get("role", "user")),
+                    is_verified=bool(user_data.get("is_verified", False)),
+                )
+            else:
+                user = self.window.auth_service.authenticate(
+                    email=self.email_edit.text().strip(),
+                    password=self.password_edit.text(),
+                )
+        except (ValueError, RuntimeError) as exc:
             QMessageBox.critical(self, "Ошибка входа", str(exc))
             return
         self.window.set_user(user)
@@ -429,10 +447,13 @@ class MainWidget(QWidget):
         )
 
     def refresh_objects(self) -> None:
-        with self.window.session_factory() as db:
-            service = PropertyService(db=db, encryption=self.window.encryption)
-            houses = service.list_houses(self.window.user.email)
-            house_views = [service.export_house_view(house) for house in houses]
+        if self.window.uses_remote_api:
+            house_views = self.window.api_client.list_objects()
+        else:
+            with self.window.session_factory() as db:
+                service = PropertyService(db=db, encryption=self.window.encryption)
+                houses = service.list_houses(self.window.user.email)
+                house_views = [service.export_house_view(house) for house in houses]
 
         self.house_map = {f"{house['name']} ({house['address']})": str(house['id']) for house in house_views}
         self.door_map = {}
@@ -460,9 +481,12 @@ class MainWidget(QWidget):
                     self.objects_table.setItem(row, col, QTableWidgetItem(str(value)))
 
     def refresh_devices(self) -> None:
-        with self.window.session_factory() as db:
-            service = LockDeviceService(db=db, encryption=self.window.encryption)
-            devices = service.list_devices(self.window.user.email)
+        if self.window.uses_remote_api:
+            devices = self.window.api_client.list_locks()
+        else:
+            with self.window.session_factory() as db:
+                service = LockDeviceService(db=db, encryption=self.window.encryption)
+                devices = service.list_devices(self.window.user.email)
 
         self.devices_table.setRowCount(0)
         for device in devices:
@@ -535,36 +559,50 @@ class MainWidget(QWidget):
             self.esp32_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP32"))
 
     def add_house(self) -> None:
-        with self.window.session_factory() as db:
-            service = PropertyService(db=db, encryption=self.window.encryption)
-            try:
-                service.add_house(
-                    self.window.user.email,
+        try:
+            if self.window.uses_remote_api:
+                self.window.api_client.create_house(
                     name=self.house_name_edit.text(),
                     address=self.house_address_edit.text(),
                 )
-            except Exception as exc:
-                QMessageBox.critical(self, "Ошибка", str(exc))
-                return
+            else:
+                with self.window.session_factory() as db:
+                    service = PropertyService(db=db, encryption=self.window.encryption)
+                    service.add_house(
+                        self.window.user.email,
+                        name=self.house_name_edit.text(),
+                        address=self.house_address_edit.text(),
+                    )
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка", str(exc))
+            return
         self.house_name_edit.clear()
         self.house_address_edit.clear()
         self.refresh_objects()
         self.window.show_status("Объект сохранён.")
 
     def add_door(self) -> None:
-        with self.window.session_factory() as db:
-            service = PropertyService(db=db, encryption=self.window.encryption)
-            try:
-                service.add_door(
-                    self.window.user.email,
+        try:
+            if self.window.uses_remote_api:
+                self.window.api_client.create_door(
                     house_id=self.house_map.get(self.house_combo.currentText(), ""),
                     name=self.door_name_edit.text(),
                     lock_label=self.lock_label_edit.text(),
                     travelline_unit_id=self.lock_unit_edit.text(),
                 )
-            except Exception as exc:
-                QMessageBox.critical(self, "Ошибка", str(exc))
-                return
+            else:
+                with self.window.session_factory() as db:
+                    service = PropertyService(db=db, encryption=self.window.encryption)
+                    service.add_door(
+                        self.window.user.email,
+                        house_id=self.house_map.get(self.house_combo.currentText(), ""),
+                        name=self.door_name_edit.text(),
+                        lock_label=self.lock_label_edit.text(),
+                        travelline_unit_id=self.lock_unit_edit.text(),
+                    )
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка", str(exc))
+            return
         self.door_name_edit.clear()
         self.lock_label_edit.clear()
         self.lock_unit_edit.clear()
@@ -604,10 +642,9 @@ class MainWidget(QWidget):
             door_uid=door_uid,
         )
 
-        with self.window.session_factory() as db:
-            service = LockDeviceService(db=db, encryption=self.window.encryption)
-            service.save_device(
-                self.window.user.email,
+        provisioning = None
+        if self.window.uses_remote_api:
+            save_result = self.window.api_client.save_lock(
                 lock_id=self.lock_id_edit.text(),
                 device_name=self.device_name_edit.text() or self.lock_id_edit.text(),
                 wifi_ssid=wifi_ssid,
@@ -617,11 +654,27 @@ class MainWidget(QWidget):
                 esp8266_uid=self.esp8266_uid_edit.text(),
                 esp32_uid=self.esp32_uid_edit.text(),
             )
+            provisioning = save_result.get("provisioning")
+        else:
+            with self.window.session_factory() as db:
+                service = LockDeviceService(db=db, encryption=self.window.encryption)
+                service.save_device(
+                    self.window.user.email,
+                    lock_id=self.lock_id_edit.text(),
+                    device_name=self.device_name_edit.text() or self.lock_id_edit.text(),
+                    wifi_ssid=wifi_ssid,
+                    wifi_password=self.wifi_password_edit.text(),
+                    port_name=self.port_combo.currentText(),
+                    door_id=door_id,
+                    esp8266_uid=self.esp8266_uid_edit.text(),
+                    esp32_uid=self.esp32_uid_edit.text(),
+                )
 
         return {
             "chip": chip,
             "port": self.detected_board.port,
             "response": response,
+            "provisioning": provisioning,
         }
 
     def activate_lock_async(self) -> None:
@@ -634,7 +687,14 @@ class MainWidget(QWidget):
             QMessageBox.information(
                 self,
                 "Активация",
-                f"Конфигурация записана в {result['chip']} и замок сохранён в сервисе.",
+                (
+                    f"Конфигурация записана в {result['chip']} и замок сохранён в сервисе.\n\n"
+                    f"Lock ID: {result['provisioning']['lock_id']}\n"
+                    f"API key: {result['provisioning']['api_key']}\n"
+                    f"API URL: {result['provisioning']['api_base_url']}"
+                )
+                if result.get("provisioning")
+                else f"Конфигурация записана в {result['chip']} и замок сохранён в сервисе.",
             )
 
         self._start_worker(
@@ -649,6 +709,11 @@ class SmartLockerDesktopWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.settings = get_settings()
+        self.api_client = (
+            SmartLockerApiClient(self.settings.smartlocker_api_base_url)
+            if self.settings.smartlocker_api_base_url
+            else None
+        )
         self.engine, self.session_factory = create_session_factory(self.settings.database_url)
         init_db(self.engine)
         self.encryption = EncryptionService(settings=self.settings)
@@ -667,6 +732,10 @@ class SmartLockerDesktopWindow(QMainWindow):
         self.setStatusBar(QStatusBar())
         self._build_menu()
         self.show_login()
+
+    @property
+    def uses_remote_api(self) -> bool:
+        return self.api_client is not None
 
     def _build_menu(self) -> None:
         menu = self.menuBar().addMenu("Сервис")

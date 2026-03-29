@@ -1,4 +1,6 @@
 import hashlib
+import hmac
+import secrets
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -31,6 +33,7 @@ class LockDeviceService:
         normalized_esp32_uid = self._normalize_optional_uid(esp32_uid)
         normalized_device_uid = normalized_esp32_uid or normalized_esp8266_uid or normalized_lock_id
         uid_hash = self._hash_uid(normalized_device_uid)
+        generated_api_key: str | None = None
 
         device = (
             self._db.query(LockDeviceModel)
@@ -58,6 +61,9 @@ class LockDeviceService:
                 port_name=port_name.strip() or None,
                 status="configured",
             )
+            generated_api_key = self._generate_api_key()
+            device.api_key_hash = self._hash_uid(generated_api_key)
+            device.api_key_encrypted = self._encryption.encrypt(generated_api_key)
             self._db.add(device)
         else:
             device.door_id = door.id if door else None
@@ -72,9 +78,15 @@ class LockDeviceService:
             device.wifi_password_encrypted = self._encryption.encrypt(wifi_password)
             device.port_name = port_name.strip() or None
             device.status = "configured"
+            if not device.api_key_hash or not device.api_key_encrypted:
+                generated_api_key = self._generate_api_key()
+                device.api_key_hash = self._hash_uid(generated_api_key)
+                device.api_key_encrypted = self._encryption.encrypt(generated_api_key)
 
         self._db.commit()
         self._db.refresh(device)
+        if generated_api_key is not None:
+            setattr(device, "_plain_api_key", generated_api_key)
         return device
 
     def list_devices(self, owner_email: str) -> list[dict[str, str]]:
@@ -100,6 +112,7 @@ class LockDeviceService:
         return {
             "id": device.id,
             "lock_id": self._encryption.decrypt(device.lock_id_encrypted),
+            "has_api_key": bool(device.api_key_hash),
             "device_uid": self._encryption.decrypt(device.device_uid_encrypted),
             "esp8266_uid": self._decrypt_optional(device.esp8266_uid_encrypted),
             "esp32_uid": self._decrypt_optional(device.esp32_uid_encrypted),
@@ -113,6 +126,32 @@ class LockDeviceService:
             "house_name": house_name,
             "updated_at": device.updated_at.isoformat(timespec="seconds"),
         }
+
+    def export_provisioning_view(self, device: LockDeviceModel, *, api_base_url: str) -> dict[str, str]:
+        api_key = getattr(device, "_plain_api_key", None)
+        if api_key is None and device.api_key_encrypted:
+            api_key = self._encryption.decrypt(device.api_key_encrypted)
+        return {
+            "lock_id": self._encryption.decrypt(device.lock_id_encrypted),
+            "api_key": api_key or "",
+            "api_base_url": api_base_url.rstrip("/"),
+        }
+
+    def authenticate_device(self, *, lock_id: str, api_key: str) -> LockDeviceModel:
+        normalized_lock_id = self._normalize_uid(lock_id)
+        device = (
+            self._db.query(LockDeviceModel)
+            .options(joinedload(LockDeviceModel.door).joinedload(DoorModel.house))
+            .filter(LockDeviceModel.lock_id_hash == self._hash_uid(normalized_lock_id))
+            .one_or_none()
+        )
+        if device is None:
+            raise ValueError("Замок не найден.")
+        if not device.api_key_hash:
+            raise ValueError("У замка не настроен API-ключ.")
+        if not hmac.compare_digest(device.api_key_hash, self._hash_uid(api_key.strip())):
+            raise ValueError("Неверный API-ключ замка.")
+        return device
 
     def _get_door(self, owner_email: str, door_id: str) -> DoorModel:
         door = (
@@ -135,6 +174,10 @@ class LockDeviceService:
     @staticmethod
     def _hash_uid(device_uid: str) -> str:
         return hashlib.sha256(device_uid.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _generate_api_key() -> str:
+        return secrets.token_urlsafe(32)
 
     @staticmethod
     def _normalize_optional_uid(device_uid: str) -> str | None:

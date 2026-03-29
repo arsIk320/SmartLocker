@@ -34,6 +34,7 @@ def apply_local_defaults() -> None:
         "HOST": "127.0.0.1",
         "PORT": "8000",
         "DATABASE_URL": "sqlite:///./smartlocker.db",
+        "SMARTLOCKER_API_BASE_URL": "",
         "JWT_SECRET_KEY": "local-dev-insecure-secret-change-before-production",
         "JWT_ALGORITHM": "HS256",
         "JWT_ACCESS_TOKEN_EXPIRE_MINUTES": "30",
@@ -112,6 +113,8 @@ def print_startup_info() -> None:
     print(f"- Swagger: http://{host}:{port}/docs")
     print(f"- Admin: {os.environ['ADMIN_EMAIL']} / {os.environ['ADMIN_PASSWORD']}")
     print(f"- Database: {os.environ['DATABASE_URL']}")
+    if os.getenv("SMARTLOCKER_API_BASE_URL"):
+        print(f"- Remote API for desktop: {os.environ['SMARTLOCKER_API_BASE_URL']}")
     if os.getenv("SMTP_HOST"):
         print(f"- SMTP: configured via {os.environ['SMTP_HOST']}:{os.environ['SMTP_PORT']}")
     else:

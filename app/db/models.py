@@ -79,6 +79,8 @@ class DoorModel(Base):
     lock_label_encrypted: Mapped[str] = mapped_column(String(4096))
     lock_uid_hash: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     lock_uid_encrypted: Mapped[str | None] = mapped_column(String(4096), nullable=True)
+    qr_secret_encrypted: Mapped[str | None] = mapped_column(String(4096), nullable=True)
+    qr_secret_rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     travelline_unit_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -121,6 +123,7 @@ class LockDeviceModel(Base):
     __table_args__ = (
         UniqueConstraint("lock_id_hash", name="uq_lock_devices_lock_id_hash"),
         UniqueConstraint("device_uid_hash", name="uq_lock_devices_uid_hash"),
+        UniqueConstraint("api_key_hash", name="uq_lock_devices_api_key_hash"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -133,6 +136,8 @@ class LockDeviceModel(Base):
     )
     lock_id_hash: Mapped[str] = mapped_column(String(128), index=True)
     lock_id_encrypted: Mapped[str] = mapped_column(String(4096))
+    api_key_hash: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    api_key_encrypted: Mapped[str | None] = mapped_column(String(4096), nullable=True)
     device_uid_hash: Mapped[str] = mapped_column(String(128), index=True)
     device_uid_encrypted: Mapped[str] = mapped_column(String(4096))
     esp8266_uid_encrypted: Mapped[str | None] = mapped_column(String(4096), nullable=True)

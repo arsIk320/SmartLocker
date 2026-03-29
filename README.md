@@ -33,6 +33,12 @@ Or use the helper launcher:
 python start.py
 ```
 
+To make the desktop app work with a deployed server instead of the local database, set:
+
+```bash
+SMARTLOCKER_API_BASE_URL=https://your-service.onrender.com
+```
+
 ## Desktop app
 
 Run the desktop application during development:
@@ -50,6 +56,12 @@ The desktop flow is aimed at the installer/customer scenario:
 - generate and write new board UIDs for `ESP8266` and `ESP32`;
 - bind the lock to the account or a specific door;
 - save SSID and Wi-Fi password for the lock.
+
+The desktop app can now authenticate against the hosted SmartLocker API and exchange:
+
+- authenticated user data;
+- objects and doors;
+- lock registration data.
 
 The desktop app now supports provisioning mode:
 

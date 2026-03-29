@@ -15,13 +15,10 @@ def create_session_factory(database_url: str) -> tuple[Engine, sessionmaker[Sess
 
 def init_db(engine: Engine) -> None:
     Base.metadata.create_all(bind=engine)
-    _apply_sqlite_compat_migrations(engine)
+    _apply_compat_migrations(engine)
 
 
-def _apply_sqlite_compat_migrations(engine: Engine) -> None:
-    if engine.dialect.name != "sqlite":
-        return
-
+def _apply_compat_migrations(engine: Engine) -> None:
     inspector = inspect(engine)
     table_names = inspector.get_table_names()
     if "doors" not in table_names:
@@ -59,6 +56,10 @@ def _apply_sqlite_compat_migrations(engine: Engine) -> None:
             connection.execute(text("ALTER TABLE doors ADD COLUMN lock_uid_hash VARCHAR(128)"))
         if "lock_uid_encrypted" not in columns:
             connection.execute(text("ALTER TABLE doors ADD COLUMN lock_uid_encrypted VARCHAR(4096)"))
+        if "qr_secret_encrypted" not in columns:
+            connection.execute(text("ALTER TABLE doors ADD COLUMN qr_secret_encrypted VARCHAR(4096)"))
+        if "qr_secret_rotated_at" not in columns:
+            connection.execute(text("ALTER TABLE doors ADD COLUMN qr_secret_rotated_at TIMESTAMP"))
         connection.execute(
             text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_doors_lock_uid_hash "
@@ -82,6 +83,10 @@ def _apply_sqlite_compat_migrations(engine: Engine) -> None:
                     "WHERE lock_id_encrypted IS NULL"
                 )
             )
+        if "api_key_hash" not in lock_columns:
+            connection.execute(text("ALTER TABLE lock_devices ADD COLUMN api_key_hash VARCHAR(128)"))
+        if "api_key_encrypted" not in lock_columns:
+            connection.execute(text("ALTER TABLE lock_devices ADD COLUMN api_key_encrypted VARCHAR(4096)"))
         if "port_name" not in lock_columns:
             connection.execute(text("ALTER TABLE lock_devices ADD COLUMN port_name VARCHAR(128)"))
         if "status" not in lock_columns:
@@ -102,6 +107,12 @@ def _apply_sqlite_compat_migrations(engine: Engine) -> None:
             text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_lock_devices_device_uid_hash "
                 "ON lock_devices (device_uid_hash)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_lock_devices_api_key_hash "
+                "ON lock_devices (api_key_hash)"
             )
         )
 
