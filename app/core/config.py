@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", ".local.env", "SmartLocker.env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     smtp_password: str | None = os.getenv("SMTP_PASSWORD")
     smtp_from_email: str | None = os.getenv("SMTP_FROM_EMAIL")
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    email_delivery_mode: str = os.getenv("EMAIL_DELIVERY_MODE", "auto").lower()
+    email_from_name: str = os.getenv("EMAIL_FROM_NAME", "SmartLocker")
+    brevo_api_key: str | None = os.getenv("BREVO_API_KEY")
 
 
 @lru_cache(maxsize=1)

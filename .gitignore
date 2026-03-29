@@ -7,3 +7,8 @@ __pycache__/
 *.pyd
 .pytest_cache/
 smartlocker.db
+build/
+dist/
+*.spec
+SmartLocker.env
+*.local
