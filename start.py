@@ -47,6 +47,7 @@ def apply_local_defaults() -> None:
         "ADMIN_PASSWORD": "Admin123!",
         "EMAIL_DELIVERY_MODE": "console",
         "EMAIL_FROM_NAME": "SmartLocker",
+        "TELEGRAM_BOT_API_BASE_URL": "http://127.0.0.1:8000",
     }
     for key, value in defaults.items():
         os.environ.setdefault(key, value)
@@ -76,6 +77,10 @@ def run_setup_wizard() -> None:
     )
     configure_travelline = (
         input("Настроить TravelLine сейчас? [y/N]: ").strip().lower()
+        in {"y", "yes", "да"}
+    )
+    configure_telegram = (
+        input("Настроить Telegram-бота сейчас? [y/N]: ").strip().lower()
         in {"y", "yes", "да"}
     )
 
@@ -162,6 +167,22 @@ def run_setup_wizard() -> None:
             os.getenv("TRAVELLINE_PROPERTY_ID", ""),
         )
 
+    if configure_telegram:
+        values["TELEGRAM_BOT_TOKEN"] = prompt_value(
+            "TELEGRAM_BOT_TOKEN",
+            os.getenv("TELEGRAM_BOT_TOKEN", ""),
+            secret=True,
+        )
+        values["TELEGRAM_BOT_API_KEY"] = prompt_value(
+            "TELEGRAM_BOT_API_KEY",
+            os.getenv("TELEGRAM_BOT_API_KEY", ""),
+            secret=True,
+        )
+        values["TELEGRAM_BOT_API_BASE_URL"] = prompt_value(
+            "TELEGRAM_BOT_API_BASE_URL",
+            os.getenv("TELEGRAM_BOT_API_BASE_URL", "http://127.0.0.1:8000"),
+        )
+
     if values:
         save_local_env(values)
         for key, value in values.items():
@@ -189,6 +210,8 @@ def print_startup_info() -> None:
         print("- TravelLine: credentials detected")
     else:
         print("- TravelLine: optional global credentials not fully set")
+    if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_BOT_API_KEY"):
+        print(f"- Telegram bot API base: {os.environ.get('TELEGRAM_BOT_API_BASE_URL', 'http://127.0.0.1:8000')}")
 
 
 def main() -> None:

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -18,36 +16,77 @@ class QrAccessService:
         encryption: EncryptionService,
         *,
         code_length: int = 11,
-        period_seconds: int = 30,
+        lifetime_seconds: int = 3600,
         secret_rotation_hours: int = 24,
     ) -> None:
         self._db = db
         self._encryption = encryption
         self._code_length = code_length
-        self._period_seconds = period_seconds
+        self._lifetime_seconds = lifetime_seconds
         self._secret_rotation_hours = secret_rotation_hours
 
     def get_current_qr_payload(self, door: DoorModel) -> dict[str, str | int]:
-        secret = self._ensure_active_secret(door)
+        self._ensure_active_secret(door)
         now = datetime.now(UTC)
-        window = int(now.timestamp() // self._period_seconds)
-        expires_at = datetime.fromtimestamp((window + 1) * self._period_seconds, tz=UTC)
-        code = self._generate_code(secret, door.door_uid, window)
+        issued_at = self._normalize_datetime(door.current_qr_issued_at)
+        expires_at = self._normalize_datetime(door.current_qr_expires_at)
+
+        if (
+            not door.current_qr_code_encrypted
+            or issued_at is None
+            or expires_at is None
+            or expires_at <= now
+        ):
+            return self._issue_new_qr(door)
+
+        code = self._encryption.decrypt(door.current_qr_code_encrypted)
+        return self._build_payload(
+            door=door,
+            code=code,
+            issued_at=issued_at,
+            expires_at=expires_at,
+        )
+
+    def rotate_qr_secret(self, door: DoorModel) -> dict[str, str | int]:
+        self._issue_new_secret(door)
+        return self._issue_new_qr(door, rotated=1)
+
+    def _issue_new_qr(self, door: DoorModel, *, rotated: int | None = None) -> dict[str, str | int]:
+        issued_at = datetime.now(UTC)
+        expires_at = issued_at + timedelta(seconds=self._lifetime_seconds)
+        code = "".join(secrets.choice("0123456789") for _ in range(self._code_length))
+        door.current_qr_code_encrypted = self._encryption.encrypt(code)
+        door.current_qr_issued_at = issued_at
+        door.current_qr_expires_at = expires_at
+        self._db.commit()
+        self._db.refresh(door)
+        payload = self._build_payload(
+            door=door,
+            code=code,
+            issued_at=issued_at,
+            expires_at=expires_at,
+        )
+        if rotated is not None:
+            payload["rotated"] = rotated
+        return payload
+
+    def _build_payload(
+        self,
+        *,
+        door: DoorModel,
+        code: str,
+        issued_at: datetime,
+        expires_at: datetime,
+    ) -> dict[str, str | int]:
+        now = datetime.now(UTC)
         return {
             "code": code,
             "door_uid": door.door_uid,
+            "issued_at": issued_at.isoformat(),
             "expires_at": expires_at.isoformat(),
             "ttl_seconds": max(1, int((expires_at - now).total_seconds())),
-            "period_seconds": self._period_seconds,
+            "valid_for_seconds": self._lifetime_seconds,
         }
-
-    def rotate_qr_secret(self, door: DoorModel) -> dict[str, str | int]:
-        secret = self._issue_new_secret(door)
-        self._db.commit()
-        self._db.refresh(door)
-        payload = self.get_current_qr_payload(door)
-        payload["rotated"] = 1
-        return payload
 
     def _ensure_active_secret(self, door: DoorModel) -> str:
         rotated_at = self._normalize_datetime(door.qr_secret_rotated_at)
@@ -70,13 +109,6 @@ class QrAccessService:
         door.qr_secret_encrypted = self._encryption.encrypt(secret)
         door.qr_secret_rotated_at = datetime.now(UTC)
         return secret
-
-    def _generate_code(self, secret: str, door_uid: str, window: int) -> str:
-        payload = f"{door_uid}:{window}".encode("utf-8")
-        digest = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).digest()
-        value = int.from_bytes(digest[:8], byteorder="big")
-        modulus = 10 ** self._code_length
-        return str(value % modulus).zfill(self._code_length)
 
     @staticmethod
     def _normalize_datetime(value: datetime | None) -> datetime | None:

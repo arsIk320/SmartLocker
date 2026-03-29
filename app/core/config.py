@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env", ".local.env", "SmartLocker.env"),
+        env_file=(".env", ".local.env", "SmartLocker.env", ".env.example"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     admin_email: str = os.getenv("ADMIN_EMAIL", "admin@smartlocker.local")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "Admin123!")
     data_encryption_key: str | None = os.getenv("DATA_ENCRYPTION_KEY")
+    data_encryption_key_legacy: str | None = os.getenv("DATA_ENCRYPTION_KEY_LEGACY")
+    face_match_distance_threshold: float = float(
+        os.getenv("FACE_MATCH_DISTANCE_THRESHOLD", "0.92")
+    )
     smtp_host: str | None = os.getenv("SMTP_HOST")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
     smtp_username: str | None = os.getenv("SMTP_USERNAME")
@@ -60,6 +64,10 @@ class Settings(BaseSettings):
     email_delivery_mode: str = os.getenv("EMAIL_DELIVERY_MODE", "auto").lower()
     email_from_name: str = os.getenv("EMAIL_FROM_NAME", "SmartLocker")
     brevo_api_key: str | None = os.getenv("BREVO_API_KEY")
+    telegram_bot_token: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
+    telegram_bot_api_key: str | None = os.getenv("TELEGRAM_BOT_API_KEY")
+    telegram_bot_api_base_url: str = os.getenv("TELEGRAM_BOT_API_BASE_URL", "http://127.0.0.1:8000")
+    telegram_proxy_url: str | None = os.getenv("TELEGRAM_PROXY_URL")
 
 
 @lru_cache(maxsize=1)

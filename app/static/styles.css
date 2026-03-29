@@ -884,6 +884,35 @@ select {
     background: rgba(255, 255, 255, 0.7);
 }
 
+.camera-shell {
+    width: 100%;
+    max-width: 760px;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #dfe8ef;
+    border: 1px solid var(--border);
+}
+
+.camera-stream {
+    width: 100%;
+    display: block;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: #dfe8ef;
+}
+
+.hidden {
+    display: none;
+}
+
+.success-panel {
+    background: rgba(31, 138, 112, 0.1);
+}
+
+.warn-panel {
+    background: rgba(197, 74, 74, 0.1);
+}
+
 @media (max-width: 1100px) {
     .public-shell {
         width: min(100% - 28px, 1280px);

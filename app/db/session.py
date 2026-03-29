@@ -60,6 +60,12 @@ def _apply_compat_migrations(engine: Engine) -> None:
             connection.execute(text("ALTER TABLE doors ADD COLUMN qr_secret_encrypted VARCHAR(4096)"))
         if "qr_secret_rotated_at" not in columns:
             connection.execute(text("ALTER TABLE doors ADD COLUMN qr_secret_rotated_at TIMESTAMP"))
+        if "current_qr_code_encrypted" not in columns:
+            connection.execute(text("ALTER TABLE doors ADD COLUMN current_qr_code_encrypted VARCHAR(4096)"))
+        if "current_qr_issued_at" not in columns:
+            connection.execute(text("ALTER TABLE doors ADD COLUMN current_qr_issued_at TIMESTAMP"))
+        if "current_qr_expires_at" not in columns:
+            connection.execute(text("ALTER TABLE doors ADD COLUMN current_qr_expires_at TIMESTAMP"))
         connection.execute(
             text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_doors_lock_uid_hash "
@@ -115,6 +121,25 @@ def _apply_compat_migrations(engine: Engine) -> None:
                 "ON lock_devices (api_key_hash)"
             )
         )
+
+    if "face_photo_submissions" not in table_names:
+        return
+
+    face_columns = {column["name"] for column in inspector.get_columns("face_photo_submissions")}
+    with engine.begin() as connection:
+        if "face_map_encrypted" not in face_columns:
+            connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN face_map_encrypted TEXT"))
+        if "face_quality_score" not in face_columns:
+            connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN face_quality_score DOUBLE PRECISION"))
+        if "face_model_version" not in face_columns:
+            connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN face_model_version VARCHAR(128)"))
+        if "processing_error" not in face_columns:
+            connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN processing_error TEXT"))
+        if "processed_at" not in face_columns:
+            connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN processed_at TIMESTAMP"))
+
+    if "telegram_guest_bindings" not in table_names:
+        return
 
 
 def get_db(request: Request) -> Generator[Session, None, None]:

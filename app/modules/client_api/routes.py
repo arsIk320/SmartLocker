@@ -55,9 +55,10 @@ class SaveLockRequest(BaseModel):
 class RotateQrResponse(BaseModel):
     code: str
     door_uid: str
+    issued_at: str
     expires_at: str
     ttl_seconds: int
-    period_seconds: int
+    valid_for_seconds: int
     rotated: int | None = None
 
 

@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db import get_db
 from app.modules.auth.service import AuthService
+from app.modules.biometrics.face_map import FaceMapError
+from app.modules.biometrics.service import FaceVerificationService, decode_data_url_image
 from app.modules.pms.connection_service import TravelLineConnectionService
 from app.modules.pms.schemas.travelline import TravelLineConnectionConfig, TravelLineSyncRequest
 from app.modules.pms.services import TravelLineSyncService
@@ -40,6 +42,13 @@ def get_property_service(
     encryption: EncryptionService = Depends(get_encryption_service),
 ) -> PropertyService:
     return PropertyService(db=db, encryption=encryption)
+
+
+def get_face_verification_service(
+    db: Session = Depends(get_db),
+    encryption: EncryptionService = Depends(get_encryption_service),
+) -> FaceVerificationService:
+    return FaceVerificationService(db=db, encryption=encryption)
 
 
 def get_travelline_connection_service(
@@ -449,6 +458,75 @@ async def objects_page(
         settings=settings,
         property_service=property_service,
         travelline_connection_service=travelline_connection_service,
+    )
+
+
+@router.get("/face-test")
+async def face_test_page(
+    request: Request,
+    face_service: FaceVerificationService = Depends(get_face_verification_service),
+):
+    user = get_current_user(request)
+    if user is None:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    if user.role == "admin":
+        return RedirectResponse(url="/admin/dashboard", status_code=status.HTTP_302_FOUND)
+
+    profiles = face_service.list_profiles(owner_email=user.email)
+    return render(
+        request,
+        "face_test.html",
+        {
+            "title": "Тест лица",
+            "user": user,
+            "profiles": profiles,
+            "result": None,
+            "error": None,
+            "form": form_state(reservation_external_id="", image_data=""),
+        },
+    )
+
+
+@router.post("/face-test")
+async def face_test_submit(
+    request: Request,
+    reservation_external_id: str = Form(...),
+    image_data: str = Form(...),
+    face_service: FaceVerificationService = Depends(get_face_verification_service),
+):
+    user = get_current_user(request)
+    if user is None:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    if user.role == "admin":
+        return RedirectResponse(url="/admin/dashboard", status_code=status.HTTP_302_FOUND)
+
+    profiles = face_service.list_profiles(owner_email=user.email)
+    try:
+        image_bytes = decode_data_url_image(image_data)
+        result = face_service.compare_probe(
+            owner_email=user.email,
+            reservation_external_id=reservation_external_id,
+            image_bytes=image_bytes,
+        )
+        error = None
+    except (ValueError, FaceMapError) as exc:
+        result = None
+        error = str(exc)
+
+    return render(
+        request,
+        "face_test.html",
+        {
+            "title": "Тест лица",
+            "user": user,
+            "profiles": profiles,
+            "result": result,
+            "error": error,
+            "form": form_state(
+                reservation_external_id=reservation_external_id,
+                image_data=image_data,
+            ),
+        },
     )
     return render(
         request,

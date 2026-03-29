@@ -16,6 +16,12 @@ FastAPI backend и Windows desktop-приложение для smart lock пла
 pip install -e .
 ```
 
+Или без editable-режима:
+
+```bash
+pip install -r requirements.txt
+```
+
 2. Скопируйте [.env.example](D:\Documents\GitHub\SmartLocker\.env.example) в `.env`
 или запустите мастер:
 
@@ -43,6 +49,30 @@ python desktop.py
 
 Desktop при пустом `SMARTLOCKER_API_BASE_URL` работает напрямую с той же общей БД.
 
+## Telegram bot
+
+Telegram-бот запускается отдельно от сайта и работает только через HTTP API.
+
+Нужны переменные:
+
+```bash
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_BOT_API_KEY=...
+TELEGRAM_BOT_API_BASE_URL=http://127.0.0.1:8000
+TELEGRAM_PROXY_URL=
+```
+
+Запуск:
+
+```bash
+python run_telegram_bot.py
+```
+
+Сценарии:
+
+- `/access` — получить данные доступа и QR-код по коду брони и фамилии/email
+- `/face` — отправить фото лица для последующей биометрической обработки
+
 ## Email
 
 Для локальной разработки можно оставить:
@@ -52,6 +82,16 @@ EMAIL_DELIVERY_MODE=console
 ```
 
 Тогда коды будут печататься в консоль сервера.
+
+## Face recognition
+
+Базовая установка больше не тянет `dlib/face-recognition`, чтобы проект нормально ставился на Windows и Python 3.12.
+
+Если нужен именно скрипт построения face map, ставьте отдельно:
+
+```bash
+pip install -r requirements-face.txt
+```
 
 ## Основные точки
 
