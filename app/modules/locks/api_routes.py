@@ -64,6 +64,24 @@ def require_lock_device(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
 
+def _query_active_grant(
+    *,
+    db: Session,
+    door_id: str,
+    now: datetime,
+    reservation_external_id: str | None = None,
+) -> AccessGrantModel | None:
+    query = db.query(AccessGrantModel).filter(
+        AccessGrantModel.door_id == door_id,
+        AccessGrantModel.status == "active",
+        AccessGrantModel.valid_from <= now,
+        AccessGrantModel.valid_to >= now,
+    )
+    if reservation_external_id:
+        query = query.filter(AccessGrantModel.reservation_external_id == reservation_external_id)
+    return query.order_by(AccessGrantModel.valid_from.desc()).first()
+
+
 @router.get("/qr/current")
 async def get_current_qr_for_lock(
     device=Depends(require_lock_device),
@@ -108,7 +126,8 @@ async def verify_face_for_lock(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Lock is not bound to a door.")
 
     content_type = (request.headers.get("content-type") or "").lower()
-    reservation_external_id = (x_booking_code or "").strip()
+    requested_reservation_external_id = (x_booking_code or "").strip()
+    reservation_external_id = requested_reservation_external_id
     image_bytes = b""
 
     if content_type.startswith("image/jpeg") or content_type.startswith("image/jpg"):
@@ -143,18 +162,45 @@ async def verify_face_for_lock(
     if not image_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image payload is empty.")
 
-    if not reservation_external_id:
-        now = datetime.now(UTC)
-        active_grant = (
-            db.query(AccessGrantModel)
-            .filter(
-                AccessGrantModel.door_id == device.door.id,
-                AccessGrantModel.status == "active",
-                AccessGrantModel.valid_from <= now,
-                AccessGrantModel.valid_to >= now,
+    now = datetime.now(UTC)
+    active_grant = None
+    if reservation_external_id:
+        active_grant = _query_active_grant(
+            db=db,
+            door_id=device.door.id,
+            now=now,
+            reservation_external_id=reservation_external_id,
+        )
+        if active_grant is None:
+            active_grant = _query_active_grant(
+                db=db,
+                door_id=device.door.id,
+                now=now,
             )
-            .order_by(AccessGrantModel.valid_from.desc())
-            .first()
+            if active_grant is None:
+                access_log_service.record_attempt(
+                    owner_email=device.owner_email,
+                    method="face",
+                    source="lock_face",
+                    result="denied",
+                    reason="no_active_reservation",
+                    reservation_external_id=reservation_external_id,
+                    door_uid=device.door.door_uid,
+                )
+                return {
+                    "open_door": False,
+                    "door_uid": device.door.door_uid,
+                    "reason": "no_active_reservation",
+                    "booking_code": "",
+                    "requested_booking_code": requested_reservation_external_id,
+                    "image_received": True,
+                }
+            reservation_external_id = active_grant.reservation_external_id
+    else:
+        active_grant = _query_active_grant(
+            db=db,
+            door_id=device.door.id,
+            now=now,
         )
         if active_grant is None:
             access_log_service.record_attempt(
@@ -170,6 +216,7 @@ async def verify_face_for_lock(
                 "door_uid": device.door.door_uid,
                 "reason": "no_active_reservation",
                 "booking_code": "",
+                "requested_booking_code": requested_reservation_external_id,
                 "image_received": True,
             }
         reservation_external_id = active_grant.reservation_external_id
@@ -197,6 +244,7 @@ async def verify_face_for_lock(
             "door_uid": device.door.door_uid,
             "reason": "face_map_error",
             "booking_code": reservation_external_id,
+            "requested_booking_code": requested_reservation_external_id,
             "error": str(exc),
             "image_received": True,
         }
@@ -215,6 +263,7 @@ async def verify_face_for_lock(
             "door_uid": device.door.door_uid,
             "reason": exc.code,
             "booking_code": reservation_external_id,
+            "requested_booking_code": requested_reservation_external_id,
             "error": str(exc),
             "image_received": True,
         }
@@ -233,6 +282,7 @@ async def verify_face_for_lock(
             "door_uid": device.door.door_uid,
             "reason": "face_verification_unavailable",
             "booking_code": reservation_external_id,
+            "requested_booking_code": requested_reservation_external_id,
             "error": str(exc),
             "image_received": True,
         }
@@ -256,6 +306,7 @@ async def verify_face_for_lock(
         "open_door": result.match,
         "reason": "face_match" if result.match else "face_mismatch",
         "booking_code": reservation_external_id,
+        "requested_booking_code": requested_reservation_external_id,
         "reservation_external_id": result.reservation_external_id,
         "guest_name": result.guest_name,
         "door_uid": device.door.door_uid,

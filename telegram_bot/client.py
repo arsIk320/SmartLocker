@@ -71,6 +71,24 @@ class SmartLockerTelegramApiClient:
         self._raise_for_status(response)
         return response.json()
 
+    async def unbind_booking(
+        self,
+        *,
+        reservation_code: str,
+        telegram_chat_id: str,
+    ) -> dict:
+        async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
+            response = await client.post(
+                f"{self._api_base_url}/api/v1/telegram/guest/unbind",
+                headers=self._headers,
+                data={
+                    "reservation_code": reservation_code,
+                    "telegram_chat_id": telegram_chat_id,
+                },
+            )
+        self._raise_for_status(response)
+        return response.json()
+
     async def lookup_guest_access(
         self,
         *,

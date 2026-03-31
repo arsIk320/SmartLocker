@@ -130,6 +130,24 @@ async def bind_guest_booking(
     return result
 
 
+@router.post("/guest/unbind")
+async def unbind_guest_booking(
+    reservation_code: str = Form(...),
+    telegram_chat_id: str = Form(...),
+    _: None = Depends(require_bot_api_key),
+    guest_service: TelegramGuestService = Depends(get_telegram_guest_service),
+):
+    try:
+        result = guest_service.unbind_guest_booking(
+            reservation_code=reservation_code,
+            telegram_chat_id=telegram_chat_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    return result
+
+
 @router.post("/guest/access")
 async def lookup_guest_access(
     reservation_code: str = Form(...),

@@ -167,23 +167,35 @@ class PropertyService:
             .all()
         )
         door_by_unit = {door.travelline_unit_id: door for door in doors if door.travelline_unit_id}
+        managed_door_ids = {door.id for door in doors}
+        if not managed_door_ids:
+            return []
+
+        existing_grants = (
+            self._db.query(AccessGrantModel)
+            .filter(
+                AccessGrantModel.owner_email == owner_key,
+                AccessGrantModel.door_id.in_(managed_door_ids),
+            )
+            .all()
+        )
+        existing_by_key = {
+            (grant.reservation_external_id, grant.door_id): grant
+            for grant in existing_grants
+        }
 
         grants: list[AccessGrantModel] = []
+        seen_keys: set[tuple[str, str]] = set()
         for reservation in reservations:
             unit_id = reservation.unit_external_id or ""
             door = door_by_unit.get(unit_id)
             if door is None:
                 continue
 
-            grant = (
-                self._db.query(AccessGrantModel)
-                .filter(
-                    AccessGrantModel.owner_email == owner_key,
-                    AccessGrantModel.reservation_external_id == reservation.external_id,
-                    AccessGrantModel.door_id == door.id,
-                )
-                .one_or_none()
-            )
+            seen_key = (reservation.external_id, door.id)
+            seen_keys.add(seen_key)
+
+            grant = existing_by_key.get(seen_key)
             if grant is None:
                 grant = AccessGrantModel(
                     owner_email=owner_key,
@@ -204,6 +216,10 @@ class PropertyService:
 
             grants.append(grant)
 
+        for key, grant in existing_by_key.items():
+            if key not in seen_keys and grant.status == "active":
+                grant.status = "inactive"
+
         self._db.commit()
         return grants
 
@@ -212,7 +228,10 @@ class PropertyService:
         grants = (
             self._db.query(AccessGrantModel)
             .options(joinedload(AccessGrantModel.door).joinedload(DoorModel.house))
-            .filter(AccessGrantModel.owner_email == owner_key)
+            .filter(
+                AccessGrantModel.owner_email == owner_key,
+                AccessGrantModel.status == "active",
+            )
             .order_by(AccessGrantModel.valid_from.desc())
             .all()
         )

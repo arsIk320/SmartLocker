@@ -133,6 +133,31 @@ class TelegramGuestService:
             "guest_name": access.guest_name,
         }
 
+    def unbind_guest_booking(
+        self,
+        *,
+        reservation_code: str,
+        telegram_chat_id: str,
+    ) -> dict[str, str]:
+        normalized_code = reservation_code.strip()
+        binding = (
+            self._db.query(TelegramGuestBindingModel)
+            .filter(
+                TelegramGuestBindingModel.telegram_chat_id == telegram_chat_id,
+                TelegramGuestBindingModel.reservation_external_id == normalized_code,
+            )
+            .one_or_none()
+        )
+        if binding is None:
+            raise ValueError("Бронь не привязана к этому Telegram.")
+
+        self._db.delete(binding)
+        self._db.commit()
+        return {
+            "reservation_external_id": normalized_code,
+            "status": "unbound",
+        }
+
     def lookup_guest_access_by_reservation(
         self,
         *,

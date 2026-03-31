@@ -552,9 +552,6 @@ bool writeImageRequest(Client &client, const ParsedUrl &parsed, camera_fb_t *fb,
   client.print("Connection: close\r\n");
   client.print(String("X-Lock-Id: ") + g_config.lockId + "\r\n");
   client.print(String("X-Lock-Api-Key: ") + g_config.apiKey + "\r\n");
-  if (String(g_config.bookingCode).length() > 0) {
-    client.print(String("X-Booking-Code: ") + g_config.bookingCode + "\r\n");
-  }
   client.print("Content-Type: image/jpeg\r\n");
   client.print(String("Content-Length: ") + fb->len + "\r\n\r\n");
 

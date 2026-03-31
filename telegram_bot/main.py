@@ -48,6 +48,9 @@ def main_menu() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="Фото лица", callback_data="menu:face"),
+                InlineKeyboardButton(text="Отвязать бронь", callback_data="menu:unbind"),
+            ],
+            [
                 InlineKeyboardButton(text="Помощь", callback_data="menu:help"),
             ],
         ]
@@ -110,17 +113,6 @@ def face_status_summary(booking: dict, index: int) -> str:
     return summary
 
 
-def help_text() -> str:
-    return (
-        "Как пользоваться ботом:\n"
-        "1. Нажмите «Привязать бронь» и введите ФИО.\n"
-        "2. Выберите свою бронь кнопкой.\n"
-        "3. Потом получите QR через «Мои QR-коды».\n"
-        "4. Фото для биометрии можно отправить через «Фото лица».\n\n"
-        "Каждый QR-код действует 1 час с момента выдачи."
-    )
-
-
 def bookings_keyboard(bookings: list[dict], action: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for index, booking in enumerate(bookings):
@@ -130,6 +122,16 @@ def bookings_keyboard(bookings: list[dict], action: str) -> InlineKeyboardMarkup
         rows.append([InlineKeyboardButton(text=label[:64], callback_data=f"{action}:{index}")])
     rows.append([InlineKeyboardButton(text="Назад в меню", callback_data="menu:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def help_text() -> str:
+    return (
+        "Как пользоваться ботом:\n"
+        "1. Нажмите «Привязать бронь» и выберите нужную бронь. Можно привязать несколько.\n"
+        "2. Получайте QR-коды через «Мои QR-коды».\n"
+        "3. Загружайте фото через «Фото лица».\n"
+        "4. Ненужные брони удаляйте через «Отвязать бронь»."
+    )
 
 
 async def send_menu(message: Message, text: str) -> None:
@@ -158,10 +160,17 @@ async def show_bound_bookings(
         return
 
     await state.update_data(bound_bookings=bookings)
-    prompt = "Выберите бронь для QR-кода:" if action == "qr" else "Выберите бронь для отправки фото:"
+    if action == "qr":
+        prompt = "Выберите бронь для QR-кода:"
+    elif action == "unbind":
+        prompt = "Выберите бронь для отвязки:"
+    else:
+        prompt = "Выберите бронь для отправки фото:"
+
     if action == "face":
         status_lines = [face_status_summary(booking, index + 1) for index, booking in enumerate(bookings)]
         prompt = f"{prompt}\n\nCurrent face profile status:\n" + "\n".join(status_lines)
+
     await target_message.answer(prompt, reply_markup=bookings_keyboard(bookings, action))
 
 
@@ -178,10 +187,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
     @dp.message(Command("start"))
     async def start(message: Message, state: FSMContext) -> None:
         await state.clear()
-        await send_menu(
-            message,
-            "Добро пожаловать в SmartLocker.\nВыберите нужное действие кнопкой ниже.",
-        )
+        await send_menu(message, "Добро пожаловать в SmartLocker.\nВыберите нужное действие кнопкой ниже.")
 
     @dp.message(Command("help"))
     async def help_handler(message: Message) -> None:
@@ -190,10 +196,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
     @dp.callback_query(F.data == "menu:home")
     async def menu_home(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
-        await send_menu_from_callback(
-            callback,
-            "Главное меню SmartLocker. Выберите действие.",
-        )
+        await send_menu_from_callback(callback, "Главное меню SmartLocker. Выберите действие.")
 
     @dp.callback_query(F.data == "menu:help")
     async def menu_help(callback: CallbackQuery) -> None:
@@ -221,10 +224,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 action="qr",
             )
         except Exception as exc:
-            await callback.message.answer(
-                f"Не удалось получить список броней: {exc}",
-                reply_markup=main_menu(),
-            )
+            await callback.message.answer(f"Не удалось получить список броней: {exc}", reply_markup=main_menu())
         await safe_callback_answer(callback)
 
     @dp.callback_query(F.data == "menu:face")
@@ -238,10 +238,21 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 action="face",
             )
         except Exception as exc:
-            await callback.message.answer(
-                f"Не удалось получить список броней: {exc}",
-                reply_markup=main_menu(),
+            await callback.message.answer(f"Не удалось получить список броней: {exc}", reply_markup=main_menu())
+        await safe_callback_answer(callback)
+
+    @dp.callback_query(F.data == "menu:unbind")
+    async def menu_unbind(callback: CallbackQuery, state: FSMContext) -> None:
+        await state.clear()
+        try:
+            await show_bound_bookings(
+                target_message=callback.message,
+                state=state,
+                api_client=api_client,
+                action="unbind",
             )
+        except Exception as exc:
+            await callback.message.answer(f"Не удалось получить список броней: {exc}", reply_markup=main_menu())
         await safe_callback_answer(callback)
 
     @dp.message(GuestFlow.waiting_for_binding_name)
@@ -260,19 +271,12 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
 
         bookings = result["bookings"]
         await state.update_data(search_bookings=bookings, guest_query=guest_query)
-        await message.answer(
-            "Выберите вашу бронь:",
-            reply_markup=bookings_keyboard(bookings, "bind"),
-        )
+        await message.answer("Выберите вашу бронь:", reply_markup=bookings_keyboard(bookings, "bind"))
 
     @dp.callback_query(F.data.startswith("bind:"))
     async def bind_callback(callback: CallbackQuery, state: FSMContext) -> None:
         data = await state.get_data()
         bookings = data.get("search_bookings", [])
-        if not bookings:
-            await safe_callback_answer(callback, "Список броней устарел. Начните заново.", show_alert=True)
-            return
-
         index = int(callback.data.split(":")[1])
         if index >= len(bookings):
             await safe_callback_answer(callback, "Эта бронь недоступна.", show_alert=True)
@@ -285,10 +289,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 telegram_chat_id=str(callback.message.chat.id),
             )
         except Exception as exc:
-            await callback.message.answer(
-                f"Не удалось привязать бронь: {exc}",
-                reply_markup=main_menu(),
-            )
+            await callback.message.answer(f"Не удалось привязать бронь: {exc}", reply_markup=main_menu())
             await state.clear()
             await safe_callback_answer(callback)
             return
@@ -315,10 +316,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 reservation_code=booking["reservation_external_id"],
             )
         except Exception as exc:
-            await callback.message.answer(
-                f"Не удалось получить доступ: {exc}",
-                reply_markup=main_menu(),
-            )
+            await callback.message.answer(f"Не удалось получить доступ: {exc}", reply_markup=main_menu())
             await state.clear()
             await safe_callback_answer(callback)
             return
@@ -356,6 +354,33 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         await callback.message.answer(text, reply_markup=back_to_menu())
         await safe_callback_answer(callback)
 
+    @dp.callback_query(F.data.startswith("unbind:"))
+    async def unbind_callback(callback: CallbackQuery, state: FSMContext) -> None:
+        data = await state.get_data()
+        bookings = data.get("bound_bookings", [])
+        index = int(callback.data.split(":")[1])
+        if index >= len(bookings):
+            await safe_callback_answer(callback, "Эта бронь недоступна.", show_alert=True)
+            return
+
+        booking = bookings[index]
+        try:
+            await api_client.unbind_booking(
+                reservation_code=booking["reservation_external_id"],
+                telegram_chat_id=str(callback.message.chat.id),
+            )
+        except Exception as exc:
+            await callback.message.answer(f"Не удалось отвязать бронь: {exc}", reply_markup=main_menu())
+            await safe_callback_answer(callback)
+            return
+
+        await state.clear()
+        await callback.message.answer(
+            f"Бронь {booking['reservation_external_id']} отвязана.",
+            reply_markup=main_menu(),
+        )
+        await safe_callback_answer(callback, "Бронь отвязана")
+
     @dp.message(GuestFlow.waiting_for_face_photo, F.photo)
     async def face_photo(message: Message, state: FSMContext, bot: Bot) -> None:
         data = await state.get_data()
@@ -370,10 +395,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 content=content.read(),
             )
         except Exception as exc:
-            await message.answer(
-                f"Не удалось отправить фото: {exc}",
-                reply_markup=main_menu(),
-            )
+            await message.answer(f"Не удалось отправить фото: {exc}", reply_markup=main_menu())
             await state.clear()
             return
 
@@ -391,10 +413,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
 
     @dp.message(GuestFlow.waiting_for_face_photo)
     async def face_photo_invalid(message: Message) -> None:
-        await message.answer(
-            "Нужно отправить именно фото сообщением Telegram.",
-            reply_markup=back_to_menu(),
-        )
+        await message.answer("Нужно отправить именно фото сообщением Telegram.", reply_markup=back_to_menu())
 
     return dp
 
