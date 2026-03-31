@@ -11,11 +11,33 @@ from app.services.encryption import EncryptionService
 from app.modules.web.routes import router as web_router
 from app.modules.web.lock_routes import router as lock_router
 from app.web import STATIC_DIR
+from telegram_bot.main import create_runtime, shutdown_runtime
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    settings = app.state.settings
+    telegram_runtime = None
+    webhook_base_url = (settings.telegram_bot_webhook_base_url or "").strip().rstrip("/")
+    if settings.telegram_bot_token and webhook_base_url:
+        telegram_runtime = await create_runtime()
+        app.state.telegram_bot_runtime = telegram_runtime
+        webhook_url = f"{webhook_base_url}{settings.api_v1_prefix}/telegram/webhook"
+        await telegram_runtime.bot.set_webhook(
+            webhook_url,
+            secret_token=settings.telegram_bot_webhook_secret or None,
+            allowed_updates=telegram_runtime.dispatcher.resolve_used_update_types(),
+        )
+    else:
+        app.state.telegram_bot_runtime = None
+    try:
+        yield
+    finally:
+        if telegram_runtime is not None:
+            try:
+                await telegram_runtime.bot.delete_webhook(drop_pending_updates=False)
+            finally:
+                await shutdown_runtime(telegram_runtime)
 
 
 def create_app() -> FastAPI:

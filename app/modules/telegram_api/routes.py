@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from aiogram.types import Update
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -45,6 +46,31 @@ def require_bot_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid bot API key.",
         )
+
+
+@router.post("/webhook")
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
+    runtime = getattr(request.app.state, "telegram_bot_runtime", None)
+    if runtime is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram webhook runtime is not configured.",
+        )
+
+    expected_secret = request.app.state.settings.telegram_bot_webhook_secret
+    if expected_secret and x_telegram_bot_api_secret_token != expected_secret:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Telegram webhook secret.",
+        )
+
+    payload = await request.json()
+    update = Update.model_validate(payload, context={"bot": runtime.bot})
+    await runtime.dispatcher.feed_update(runtime.bot, update)
+    return {"ok": True}
 
 
 @router.post("/guest/bookings")

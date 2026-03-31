@@ -1,57 +1,53 @@
 # Render Deployment
 
-This project can run on Render as two services:
+This project can run on Render as a single public web service:
 
-- `smartlocker-api`: public web service with a persistent disk and SQLite
-- `smartlocker-bot`: background worker that talks to the API over Render's private network
+- `smartlocker-api`: FastAPI app on Render
+- Telegram bot runs inside the same app through a webhook endpoint
+- PostgreSQL lives on Neon
 
 ## Why this works
 
-The Telegram bot does not access the database directly. It only calls HTTP API endpoints.
-That means SQLite can live only on the API service disk and still be used safely.
+Render free web service is enough for the API and webhook bot.
+Neon provides the shared database without requiring Render disks or a paid worker.
 
 ## Files
 
 - Blueprint: [render.yaml](/D:/Documents/GitHub/SmartLocker/render.yaml)
 - Example env vars: [.env.example](/D:/Documents/GitHub/SmartLocker/.env.example)
 
-## API service
+## Database
 
-The API service uses:
+Use Neon and set:
 
 ```env
-DATABASE_URL=sqlite:////var/data/smartlocker.db
+DATABASE_URL=postgresql+psycopg://...
 ```
 
-The persistent disk is mounted at:
+## Telegram webhook
+
+Set the public Render URL for both:
+
+```env
+SMARTLOCKER_API_BASE_URL=https://your-api-name.onrender.com
+TELEGRAM_BOT_WEBHOOK_BASE_URL=https://your-api-name.onrender.com
+```
+
+The app will register Telegram webhook here:
 
 ```text
-/var/data
+https://your-api-name.onrender.com/api/v1/telegram/webhook
 ```
-
-## Bot service
-
-The bot can use either:
-
-```env
-TELEGRAM_BOT_API_BASE_URL=https://your-public-api.onrender.com
-```
-
-or the internal Render host/port pair:
-
-```env
-TELEGRAM_BOT_API_INTERNAL_HOST=...
-TELEGRAM_BOT_API_INTERNAL_PORT=...
-```
-
-If `TELEGRAM_BOT_API_BASE_URL` is empty, the bot builds the base URL from the internal host and port.
 
 ## Required secrets
 
 Set these in Render before first real use:
 
+- `DATABASE_URL`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_BOT_API_KEY`
+- `TELEGRAM_BOT_WEBHOOK_BASE_URL`
+- `TELEGRAM_BOT_WEBHOOK_SECRET`
 - `ADMIN_PASSWORD`
 - `SMARTLOCKER_API_BASE_URL`
 - `JWT_SECRET_KEY`
@@ -66,17 +62,14 @@ Optional, depending on your setup:
 
 1. Push this repository to GitHub.
 2. In Render, create a new Blueprint from the repo.
-3. Confirm both services from [render.yaml](/D:/Documents/GitHub/SmartLocker/render.yaml).
+3. Confirm the single web service from [render.yaml](/D:/Documents/GitHub/SmartLocker/render.yaml).
 4. Fill in the missing secrets.
-5. After the API gets its public Render URL, set:
+5. Create a Neon database and copy its connection string to `DATABASE_URL`.
+6. After the Render service gets its public URL, set:
 
 ```env
 SMARTLOCKER_API_BASE_URL=https://your-api-name.onrender.com
+TELEGRAM_BOT_WEBHOOK_BASE_URL=https://your-api-name.onrender.com
 ```
 
-6. Redeploy the API and bot.
-
-## Important note about SQLite
-
-SQLite on Render needs a persistent disk, which is available only on paid plans that support disks.
-The database file is tied to the API service disk and is not meant to be shared directly with another service.
+7. Redeploy the service.

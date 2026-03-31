@@ -2,14 +2,10 @@ services:
   - type: web
     name: smartlocker-api
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python start.py
     healthCheckPath: /health
-    disk:
-      name: smartlocker-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: APP_ENV
         value: production
@@ -20,7 +16,7 @@ services:
       - key: UVICORN_RELOAD
         value: "false"
       - key: DATABASE_URL
-        value: sqlite:////var/data/smartlocker.db
+        sync: false
       - key: SESSION_COOKIE_SECURE
         value: "true"
       - key: EMAIL_DELIVERY_MODE
@@ -31,6 +27,12 @@ services:
         generateValue: true
       - key: TELEGRAM_BOT_API_KEY
         sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_WEBHOOK_BASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_WEBHOOK_SECRET
+        generateValue: true
       - key: SMARTLOCKER_API_BASE_URL
         sync: false
       - key: ADMIN_EMAIL
@@ -56,34 +58,4 @@ services:
       - key: SMTP_FROM_EMAIL
         sync: false
       - key: SMTP_USE_TLS
-        sync: false
-
-  - type: worker
-    name: smartlocker-bot
-    runtime: python
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: python run_telegram_bot.py
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: DEBUG
-        value: "false"
-      - key: TELEGRAM_BOT_TOKEN
-        sync: false
-      - key: TELEGRAM_BOT_API_KEY
-        sync: false
-      - key: TELEGRAM_BOT_API_BASE_URL
-        value: ""
-      - key: TELEGRAM_BOT_API_INTERNAL_HOST
-        fromService:
-          type: web
-          name: smartlocker-api
-          property: host
-      - key: TELEGRAM_BOT_API_INTERNAL_PORT
-        fromService:
-          type: web
-          name: smartlocker-api
-          property: port
-      - key: TELEGRAM_PROXY_URL
         sync: false
