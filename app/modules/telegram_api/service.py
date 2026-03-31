@@ -170,7 +170,10 @@ class TelegramGuestService:
         grant = (
             self._db.query(AccessGrantModel)
             .options(joinedload(AccessGrantModel.door).joinedload(DoorModel.house))
-            .filter(AccessGrantModel.reservation_external_id == normalized_code)
+            .filter(
+                AccessGrantModel.reservation_external_id == normalized_code,
+                AccessGrantModel.status == "active",
+            )
             .one_or_none()
         )
         if grant is None:

@@ -4,7 +4,7 @@ from secrets import token_hex
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import AccessGrantModel, DoorModel, HouseModel
-from app.models.domain import Reservation
+from app.models.domain import Reservation, ReservationStatus
 from app.services.encryption import EncryptionService
 
 
@@ -193,10 +193,12 @@ class PropertyService:
                 continue
 
             seen_key = (reservation.external_id, door.id)
-            seen_keys.add(seen_key)
+            is_active_reservation = self._is_reservation_access_active(reservation)
+            if is_active_reservation:
+                seen_keys.add(seen_key)
 
             grant = existing_by_key.get(seen_key)
-            if grant is None:
+            if grant is None and is_active_reservation:
                 grant = AccessGrantModel(
                     owner_email=owner_key,
                     reservation_external_id=reservation.external_id,
@@ -208,13 +210,14 @@ class PropertyService:
                     valid_to=reservation.check_out,
                 )
                 self._db.add(grant)
-            else:
+            elif grant is not None:
                 grant.guest_name_encrypted = self._encryption.encrypt(reservation.guest_name)
                 grant.valid_from = reservation.check_in
                 grant.valid_to = reservation.check_out
-                grant.status = "active"
+                grant.status = "active" if is_active_reservation else "inactive"
 
-            grants.append(grant)
+            if grant is not None:
+                grants.append(grant)
 
         for key, grant in existing_by_key.items():
             if key not in seen_keys and grant.status == "active":
@@ -319,3 +322,11 @@ class PropertyService:
         if not door.lock_uid_encrypted:
             return None
         return self._encryption.decrypt(door.lock_uid_encrypted)
+
+    @staticmethod
+    def _is_reservation_access_active(reservation: Reservation) -> bool:
+        return reservation.status in {
+            ReservationStatus.pending,
+            ReservationStatus.confirmed,
+            ReservationStatus.checked_in,
+        }
