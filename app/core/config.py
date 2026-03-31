@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+from pydantic import field_validator
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,6 +61,39 @@ class Settings(BaseSettings):
     telegram_bot_webhook_base_url: str | None = None
     telegram_bot_webhook_secret: str | None = None
     telegram_proxy_url: str | None = None
+
+    @field_validator(
+        "smartlocker_api_base_url",
+        "travelline_client_id",
+        "travelline_client_secret",
+        "travelline_property_id",
+        "data_encryption_key",
+        "data_encryption_key_legacy",
+        "smtp_host",
+        "smtp_username",
+        "smtp_password",
+        "smtp_from_email",
+        "brevo_api_key",
+        "telegram_bot_token",
+        "telegram_bot_api_key",
+        "telegram_bot_api_internal_host",
+        "telegram_bot_webhook_base_url",
+        "telegram_bot_webhook_secret",
+        "telegram_proxy_url",
+        mode="before",
+    )
+    @classmethod
+    def blank_strings_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("telegram_bot_api_internal_port", mode="before")
+    @classmethod
+    def blank_port_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 @lru_cache(maxsize=1)
