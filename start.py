@@ -1,4 +1,5 @@
 import os
+import sys
 from getpass import getpass
 from pathlib import Path
 
@@ -223,7 +224,10 @@ def main() -> None:
         print(f"Удалён файл локальных настроек: {LOCAL_ENV_FILE.resolve()}")
     load_local_env_file()
     apply_local_defaults()
-    if "--setup" in os.sys.argv or not LOCAL_ENV_FILE.exists():
+    interactive_session = sys.stdin is not None and sys.stdin.isatty()
+    if "--setup" in os.sys.argv:
+        run_setup_wizard()
+    elif not LOCAL_ENV_FILE.exists() and interactive_session:
         run_setup_wizard()
     print_startup_info()
     reload_enabled = os.environ.get("UVICORN_RELOAD", "false").strip().lower() in {"1", "true", "yes", "on"}
