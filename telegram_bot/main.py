@@ -97,7 +97,10 @@ def face_status_label(status: str | None) -> str:
 
 def face_status_summary(booking: dict, index: int) -> str:
     status = face_status_label(booking.get("face_profile_status"))
-    summary = f"{index}. {booking['house_name']} / {booking['door_name']} - {status}"
+    summary = (
+        f"{index}. {booking['reservation_external_id']}\n"
+        f"   {booking['house_name']} / {booking['door_name']} - {status}"
+    )
     quality = booking.get("face_profile_quality_score")
     if quality is not None and status == "processed":
         summary += f" (quality={float(quality):.2f})"
@@ -121,7 +124,9 @@ def help_text() -> str:
 def bookings_keyboard(bookings: list[dict], action: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for index, booking in enumerate(bookings):
-        label = f"{booking['house_name']} • {booking['door_name']}"
+        reservation = str(booking["reservation_external_id"])
+        short_reservation = reservation if len(reservation) <= 18 else reservation[-18:]
+        label = f"{short_reservation} • {booking['door_name']}"
         rows.append([InlineKeyboardButton(text=label[:64], callback_data=f"{action}:{index}")])
     rows.append([InlineKeyboardButton(text="Назад в меню", callback_data="menu:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
