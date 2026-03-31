@@ -1,21 +1,88 @@
 from collections.abc import Generator
 
+import psycopg
 from fastapi import Request
 from sqlalchemy import Engine, create_engine, inspect, text
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
+from sqlalchemy.schema import CreateIndex, CreateTable
 
 from app.db.base import Base
 
 
 def create_session_factory(database_url: str) -> tuple[Engine, sessionmaker[Session]]:
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    engine = create_engine(database_url, future=True, connect_args=connect_args)
+    if database_url.startswith("sqlite"):
+        engine = create_engine(
+            database_url,
+            future=True,
+            connect_args={"check_same_thread": False},
+        )
+        return engine, sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+
+    engine_kwargs: dict = {
+        "future": True,
+        "pool_pre_ping": True,
+    }
+    connect_args: dict = {}
+
+    # Managed Postgres poolers (Supabase/Neon) behave best when SQLAlchemy avoids
+    # reset/rollback cycles and native hstore introspection on connect.
+    if "pooler.supabase.com" in database_url:
+        engine_kwargs["isolation_level"] = "AUTOCOMMIT"
+        engine_kwargs["pool_reset_on_return"] = None
+        engine_kwargs["skip_autocommit_rollback"] = True
+        engine_kwargs["use_native_hstore"] = False
+        engine_kwargs["client_encoding"] = "utf8"
+        if ":6543/" in database_url:
+            engine_kwargs["poolclass"] = NullPool
+            connect_args["prepare_threshold"] = None
+
+    # Neon pooled/direct connections behind PgBouncer are most stable for our
+    # startup path when SQLAlchemy avoids reset/rollback cycles on connect.
+    if "neon.tech" in database_url:
+        engine_kwargs["isolation_level"] = "AUTOCOMMIT"
+        engine_kwargs["pool_reset_on_return"] = None
+        engine_kwargs["skip_autocommit_rollback"] = True
+        engine_kwargs["use_native_hstore"] = False
+
+    engine = create_engine(
+        database_url,
+        connect_args=connect_args,
+        **engine_kwargs,
+    )
     return engine, sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
-def init_db(engine: Engine) -> None:
+def init_db(engine: Engine, database_url: str | None = None) -> None:
+    if database_url and ("neon.tech" in database_url or "pooler.supabase.com" in database_url):
+        _bootstrap_neon_schema(database_url)
+        return
+
     Base.metadata.create_all(bind=engine)
     _apply_compat_migrations(engine)
+
+
+def _bootstrap_neon_schema(database_url: str) -> None:
+    raw_url = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+    dialect = postgresql.dialect()
+
+    with psycopg.connect(raw_url) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            for table in Base.metadata.sorted_tables:
+                create_table_sql = str(CreateTable(table).compile(dialect=dialect))
+                try:
+                    cursor.execute(create_table_sql)
+                except psycopg.errors.DuplicateTable:
+                    pass
+
+                for index in table.indexes:
+                    create_index_sql = str(CreateIndex(index).compile(dialect=dialect))
+                    try:
+                        cursor.execute(create_index_sql)
+                    except (psycopg.errors.DuplicateTable, psycopg.errors.DuplicateObject):
+                        pass
 
 
 def _apply_compat_migrations(engine: Engine) -> None:

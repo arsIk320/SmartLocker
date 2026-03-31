@@ -26,6 +26,8 @@ class SerialProvisioningService:
     """Provision ESP boards over a simple newline-delimited JSON serial protocol."""
 
     PROTOCOL_NAME = "smartlocker-provisioning-v1"
+    READ_POLL_TIMEOUT = 0.25
+    PREPARE_DELAY_SECONDS = 0.35
 
     def list_ports(self) -> list[SerialBoardInfo]:
         ports = []
@@ -64,9 +66,9 @@ class SerialProvisioningService:
                 networks.append(ssid)
         return networks
 
-    def identify_board(self, port_name: str, *, baudrate: int = 115200, timeout: float = 6.0) -> SerialBoardInfo:
+    def identify_board(self, port_name: str, *, baudrate: int = 9600, timeout: float = 3.0) -> SerialBoardInfo:
         port_info = self._lookup_port(port_name)
-        with serial.Serial(port=port_name, baudrate=baudrate, timeout=timeout, write_timeout=timeout) as connection:
+        with self._open_connection(port_name=port_name, baudrate=baudrate, timeout=timeout) as connection:
             self._prepare_connection(connection)
             response = self._request(
                 connection,
@@ -104,8 +106,10 @@ class SerialProvisioningService:
         wifi_password: str,
         owner_email: str,
         door_uid: str = "",
-        baudrate: int = 115200,
-        timeout: float = 8.0,
+        api_key: str = "",
+        api_base_url: str = "",
+        baudrate: int = 9600,
+        timeout: float = 5.0,
     ) -> dict[str, object]:
         normalized_chip = chip.strip().upper()
         if normalized_chip not in {"ESP8266", "ESP32"}:
@@ -123,10 +127,12 @@ class SerialProvisioningService:
                 "wifi_password": wifi_password,
                 "owner_email": owner_email,
                 "door_uid": door_uid,
+                "api_key": api_key,
+                "api_base_url": api_base_url,
             },
         }
 
-        with serial.Serial(port=port_name, baudrate=baudrate, timeout=timeout, write_timeout=timeout) as connection:
+        with self._open_connection(port_name=port_name, baudrate=baudrate, timeout=timeout) as connection:
             self._prepare_connection(connection)
             return self._request(connection, payload, timeout=timeout, attempts=3)
 
@@ -144,6 +150,15 @@ class SerialProvisioningService:
             if item.port == port_name:
                 return item
         return SerialBoardInfo(port=port_name, description=port_name, hwid="")
+
+    def _open_connection(self, *, port_name: str, baudrate: int, timeout: float) -> serial.Serial:
+        read_timeout = min(self.READ_POLL_TIMEOUT, max(timeout, 0.1))
+        return serial.Serial(
+            port=port_name,
+            baudrate=baudrate,
+            timeout=read_timeout,
+            write_timeout=max(timeout, 1.0),
+        )
 
     def _request(
         self,
@@ -193,4 +208,4 @@ class SerialProvisioningService:
             pass
         connection.reset_input_buffer()
         connection.reset_output_buffer()
-        time.sleep(1.8)
+        time.sleep(SerialProvisioningService.PREPARE_DELAY_SECONDS)

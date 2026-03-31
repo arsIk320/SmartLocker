@@ -258,6 +258,54 @@ Suggested event payload:
 
 ## Development checklist for tomorrow
 
+## Local lock test flow
+
+Use this sequence for the first end-to-end tests with a real board:
+
+1. start the API server:
+
+```powershell
+python start.py
+```
+
+2. start the desktop app:
+
+```powershell
+python desktop.py
+```
+
+3. in Desktop:
+   - create a house and a door;
+   - open `Подключение замка`;
+   - detect the board;
+   - select Wi-Fi and the target door;
+   - activate the lock.
+
+4. after activation, copy or verify the generated values:
+   - `lock_id`
+   - `api_key`
+   - `api_base_url`
+
+5. open the `Тест lock API` tab in Desktop:
+   - click `Подставить последний lock`;
+   - click `Проверить /health`;
+   - click `Получить QR`.
+
+6. write the same values into firmware or test requests:
+   - `lock_id`
+   - `api_key`
+   - `api_base_url`
+
+7. emulate the board request:
+
+```http
+GET /api/v1/locks/qr/current
+X-Lock-Id: <lock_id>
+X-Lock-Api-Key: <api_key>
+```
+
+If this responds with a QR payload, the software side of lock provisioning is ready for hardware tests.
+
 1. implement `POST /api/v1/locks/face/verify`;
 2. add lock heartbeat endpoint;
 3. add lock event logging endpoint;

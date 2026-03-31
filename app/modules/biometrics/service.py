@@ -75,6 +75,8 @@ class FaceVerificationService:
         owner_email: str,
         reservation_external_id: str,
         image_bytes: bytes,
+        threshold_override: float | None = None,
+        min_probe_quality_score: float | None = None,
     ) -> FaceCompareResult:
         grant = (
             self._db.query(AccessGrantModel)
@@ -95,21 +97,28 @@ class FaceVerificationService:
 
         stored_map = json.loads(self._encryption.decrypt(submission.face_map_encrypted))
         probe_map = build_face_map_from_bytes(image_bytes)
+        probe_quality_score = float(probe_map["quality_score"])
+        if min_probe_quality_score is not None and probe_quality_score < min_probe_quality_score:
+            raise ValueError(
+                f"Live probe quality is too low. quality_score={probe_quality_score:.4f}, "
+                f"required>={min_probe_quality_score:.4f}"
+            )
 
         stored_embedding = np.array(stored_map["embedding"], dtype=np.float32)
         probe_embedding = np.array(probe_map["embedding"], dtype=np.float32)
         distance = float(np.linalg.norm(stored_embedding - probe_embedding))
         confidence = max(0.0, min(1.0, 1.0 - distance / 1.5))
+        threshold = threshold_override if threshold_override is not None else self._threshold
 
         return FaceCompareResult(
             reservation_external_id=reservation_external_id,
             guest_name=self._encryption.decrypt(grant.guest_name_encrypted),
-            match=distance <= self._threshold,
+            match=distance <= threshold,
             distance=round(distance, 4),
             confidence=round(confidence, 4),
-            threshold=self._threshold,
+            threshold=round(float(threshold), 4),
             stored_quality_score=submission.face_quality_score,
-            probe_quality_score=float(probe_map["quality_score"]),
+            probe_quality_score=probe_quality_score,
         )
 
     def _latest_submission(self, *, reservation_id: str) -> FacePhotoSubmissionModel | None:

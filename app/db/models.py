@@ -176,6 +176,25 @@ class FacePhotoSubmissionModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class AccessAttemptLogModel(Base):
+    __tablename__ = "access_attempt_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    owner_email: Mapped[str] = mapped_column(String(320), index=True)
+    reservation_external_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    door_uid: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    method: Mapped[str] = mapped_column(String(32), default="face")
+    source: Mapped[str] = mapped_column(String(32), default="lock")
+    result: Mapped[str] = mapped_column(String(16), default="denied")
+    reason: Mapped[str] = mapped_column(String(128), default="unknown")
+    guest_name_encrypted: Mapped[str | None] = mapped_column(String(4096), nullable=True)
+    distance: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    probe_quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class TelegramGuestBindingModel(Base):
     __tablename__ = "telegram_guest_bindings"
     __table_args__ = (

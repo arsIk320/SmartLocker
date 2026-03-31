@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     engine, session_factory = create_session_factory(settings.database_url)
-    init_db(engine)
+    init_db(engine, settings.database_url)
     encryption_service = EncryptionService(settings=settings)
     app = FastAPI(
         title=settings.app_name,

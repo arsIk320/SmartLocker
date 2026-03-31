@@ -6,7 +6,7 @@ import httpx
 class SmartLockerApiClient:
     def __init__(self, base_url: str, timeout: float = 20.0) -> None:
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.Client(base_url=self.base_url, timeout=timeout)
+        self._client = httpx.Client(base_url=self.base_url, timeout=timeout, trust_env=False)
         self._token: str | None = None
 
     def set_token(self, token: str | None) -> None:
@@ -103,7 +103,23 @@ class SmartLockerApiClient:
             },
         )
         self._raise_for_error(response)
-        return response.json()["device"]
+        return response.json()
+
+    def health(self) -> dict:
+        response = self._client.get("/health")
+        self._raise_for_error(response)
+        return response.json()
+
+    def get_lock_current_qr(self, *, lock_id: str, api_key: str) -> dict:
+        response = self._client.get(
+            "/api/v1/locks/qr/current",
+            headers={
+                "X-Lock-Id": lock_id,
+                "X-Lock-Api-Key": api_key,
+            },
+        )
+        self._raise_for_error(response)
+        return response.json()
 
     def _auth_headers(self) -> dict[str, str]:
         if not self._token:

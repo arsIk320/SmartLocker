@@ -33,6 +33,7 @@ def apply_local_defaults() -> None:
         "DEBUG": "true",
         "HOST": "127.0.0.1",
         "PORT": "8000",
+        "UVICORN_RELOAD": "false",
         "DATABASE_URL": "sqlite:///./smartlocker.db",
         "SMARTLOCKER_API_BASE_URL": "",
         "JWT_SECRET_KEY": "local-dev-insecure-secret-change-before-production",
@@ -196,9 +197,11 @@ def run_setup_wizard() -> None:
 def print_startup_info() -> None:
     host = os.environ["HOST"]
     port = os.environ["PORT"]
+    reload_enabled = os.environ.get("UVICORN_RELOAD", "false").strip().lower() in {"1", "true", "yes", "on"}
     print("SmartLocker startup configuration")
     print(f"- URL: http://{host}:{port}")
     print(f"- Swagger: http://{host}:{port}/docs")
+    print(f"- Uvicorn reload: {'on' if reload_enabled else 'off'}")
     print(f"- Admin: {os.environ['ADMIN_EMAIL']} / {os.environ['ADMIN_PASSWORD']}")
     print(f"- Database: {os.environ['DATABASE_URL']}")
     if os.getenv("SMARTLOCKER_API_BASE_URL"):
@@ -223,11 +226,12 @@ def main() -> None:
     if "--setup" in os.sys.argv or not LOCAL_ENV_FILE.exists():
         run_setup_wizard()
     print_startup_info()
+    reload_enabled = os.environ.get("UVICORN_RELOAD", "false").strip().lower() in {"1", "true", "yes", "on"}
     uvicorn.run(
         "app.main:app",
         host=os.environ["HOST"],
         port=int(os.environ["PORT"]),
-        reload=True,
+        reload=reload_enabled,
     )
 
 

@@ -55,6 +55,35 @@
     </form>
 </section>
 
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <p class="section-kicker">ЖУРНАЛ</p>
+            <h2>Последние 100 попыток по лицу</h2>
+        </div>
+    </div>
+    <div class="grant-grid">
+        {% for entry in recent_access_logs %}
+        <article class="grant-card">
+            <div class="overview-head">
+                <strong>{{ entry.result }}</strong>
+                <span class="pill">{{ entry.source }}</span>
+            </div>
+            <span>Причина: {{ entry.reason }}</span>
+            <span>Время: {{ entry.created_at }}</span>
+            <span>Гость: {{ entry.guest_name or "—" }}</span>
+            <span>Бронь: {{ entry.reservation_external_id or "—" }}</span>
+            <span>Distance: {{ entry.distance if entry.distance is not none else "—" }}</span>
+            <span>Confidence: {{ entry.confidence if entry.confidence is not none else "—" }}</span>
+            <span>Порог: {{ entry.threshold if entry.threshold is not none else "—" }}</span>
+            <span>Качество live: {{ entry.probe_quality_score if entry.probe_quality_score is not none else "—" }}</span>
+        </article>
+        {% else %}
+        <div class="empty-card">Пока нет попыток сравнения.</div>
+        {% endfor %}
+    </div>
+</section>
+
 <script>
 (() => {
     const video = document.getElementById("camera-stream");

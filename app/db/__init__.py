@@ -1,5 +1,6 @@
 from app.db.base import Base
 from app.db.models import (
+    AccessAttemptLogModel,
     AccessGrantModel,
     AuthUserModel,
     DoorModel,
@@ -15,6 +16,7 @@ __all__ = [
     "AccessGrantModel",
     "AuthUserModel",
     "Base",
+    "AccessAttemptLogModel",
     "DoorModel",
     "FacePhotoSubmissionModel",
     "HouseModel",

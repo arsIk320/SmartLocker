@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db import get_db
+from app.modules.access_logs.service import AccessAttemptLogService
 from app.modules.auth.service import AuthService
 from app.modules.biometrics.face_map import FaceMapError
 from app.modules.biometrics.service import FaceVerificationService, decode_data_url_image
@@ -49,6 +50,13 @@ def get_face_verification_service(
     encryption: EncryptionService = Depends(get_encryption_service),
 ) -> FaceVerificationService:
     return FaceVerificationService(db=db, encryption=encryption)
+
+
+def get_access_attempt_log_service(
+    db: Session = Depends(get_db),
+    encryption: EncryptionService = Depends(get_encryption_service),
+) -> AccessAttemptLogService:
+    return AccessAttemptLogService(db=db, encryption=encryption)
 
 
 def get_travelline_connection_service(
@@ -411,6 +419,7 @@ async def user_dashboard(
     settings: Settings = Depends(get_settings),
     property_service: PropertyService = Depends(get_property_service),
     travelline_connection_service: TravelLineConnectionService = Depends(get_travelline_connection_service),
+    access_log_service: AccessAttemptLogService = Depends(get_access_attempt_log_service),
 ):
     user = get_current_user(request)
     if user is None:
@@ -432,6 +441,7 @@ async def user_dashboard(
             "title": "Кабинет пользователя",
             "user": user,
             **dashboard_data,
+            "recent_access_logs": access_log_service.list_recent(owner_email=user.email, limit=100),
             "travelline_form": form_state(
                 client_id=connection_view["client_id"] if connection_view else "",
                 property_ids=connection_view["property_ids"] if connection_view else "",
@@ -465,6 +475,7 @@ async def objects_page(
 async def face_test_page(
     request: Request,
     face_service: FaceVerificationService = Depends(get_face_verification_service),
+    access_log_service: AccessAttemptLogService = Depends(get_access_attempt_log_service),
 ):
     user = get_current_user(request)
     if user is None:
@@ -480,6 +491,7 @@ async def face_test_page(
             "title": "Тест лица",
             "user": user,
             "profiles": profiles,
+            "recent_access_logs": access_log_service.list_recent(owner_email=user.email, limit=100),
             "result": None,
             "error": None,
             "form": form_state(reservation_external_id="", image_data=""),
@@ -493,6 +505,7 @@ async def face_test_submit(
     reservation_external_id: str = Form(...),
     image_data: str = Form(...),
     face_service: FaceVerificationService = Depends(get_face_verification_service),
+    access_log_service: AccessAttemptLogService = Depends(get_access_attempt_log_service),
 ):
     user = get_current_user(request)
     if user is None:
@@ -509,9 +522,30 @@ async def face_test_submit(
             image_bytes=image_bytes,
         )
         error = None
+        access_log_service.record_attempt(
+            owner_email=user.email,
+            method="face",
+            source="web_face_test",
+            result="granted" if result.match else "denied",
+            reason="face_match" if result.match else "face_mismatch",
+            reservation_external_id=result.reservation_external_id,
+            guest_name=result.guest_name,
+            distance=result.distance,
+            confidence=result.confidence,
+            threshold=result.threshold,
+            probe_quality_score=result.probe_quality_score,
+        )
     except (ValueError, FaceMapError) as exc:
         result = None
         error = str(exc)
+        access_log_service.record_attempt(
+            owner_email=user.email,
+            method="face",
+            source="web_face_test",
+            result="denied",
+            reason="face_verification_error",
+            reservation_external_id=reservation_external_id,
+        )
 
     return render(
         request,
@@ -520,6 +554,7 @@ async def face_test_submit(
             "title": "Тест лица",
             "user": user,
             "profiles": profiles,
+            "recent_access_logs": access_log_service.list_recent(owner_email=user.email, limit=100),
             "result": result,
             "error": error,
             "form": form_state(
