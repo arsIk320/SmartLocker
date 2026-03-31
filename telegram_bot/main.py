@@ -88,6 +88,25 @@ def guest_summary(data: dict) -> str:
     )
 
 
+def face_status_label(status: str | None) -> str:
+    normalized = str(status or "missing").strip().lower()
+    if normalized in {"processed", "processing", "failed", "missing"}:
+        return normalized
+    return "missing"
+
+
+def face_status_summary(booking: dict, index: int) -> str:
+    status = face_status_label(booking.get("face_profile_status"))
+    summary = f"{index}. {booking['house_name']} / {booking['door_name']} - {status}"
+    quality = booking.get("face_profile_quality_score")
+    if quality is not None and status == "processed":
+        summary += f" (quality={float(quality):.2f})"
+    error = str(booking.get("face_profile_error") or "").strip()
+    if error and status == "failed":
+        summary += f"\n   error: {error}"
+    return summary
+
+
 def help_text() -> str:
     return (
         "Как пользоваться ботом:\n"
@@ -134,11 +153,10 @@ async def show_bound_bookings(
         return
 
     await state.update_data(bound_bookings=bookings)
-    prompt = (
-        "Выберите бронь для QR-кода:"
-        if action == "qr"
-        else "Выберите бронь для отправки фото:"
-    )
+    prompt = "Выберите бронь для QR-кода:" if action == "qr" else "Выберите бронь для отправки фото:"
+    if action == "face":
+        status_lines = [face_status_summary(booking, index + 1) for index, booking in enumerate(bookings)]
+        prompt = f"{prompt}\n\nCurrent face profile status:\n" + "\n".join(status_lines)
     await target_message.answer(prompt, reply_markup=bookings_keyboard(bookings, action))
 
 
@@ -314,15 +332,23 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             return
 
         booking = bookings[index]
+        current_status = face_status_label(booking.get("face_profile_status"))
+        current_error = str(booking.get("face_profile_error") or "").strip()
         await state.update_data(
             reservation_code=booking["reservation_external_id"],
             guest_query=booking["guest_name"],
         )
         await state.set_state(GuestFlow.waiting_for_face_photo)
-        await callback.message.answer(
-            "Отправьте одно фото лица сообщением Telegram.",
-            reply_markup=back_to_menu(),
+
+        text = (
+            f"Бронь: {booking['reservation_external_id']}\n"
+            f"Текущий статус face profile: {current_status}\n\n"
+            "Отправьте одно фото лица сообщением Telegram."
         )
+        if current_error and current_status == "failed":
+            text += f"\nПоследняя ошибка обработки: {current_error}"
+
+        await callback.message.answer(text, reply_markup=back_to_menu())
         await safe_callback_answer(callback)
 
     @dp.message(GuestFlow.waiting_for_face_photo, F.photo)
@@ -346,10 +372,16 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             await state.clear()
             return
 
-        await message.answer(
-            f"Фото получено и сохранено.\nID заявки: {result['submission_id']}\nСтатус: {result['status']}",
-            reply_markup=main_menu(),
+        status_text = str(result.get("face_profile_status") or result.get("status") or "unknown")
+        response_text = (
+            "Фото получено и сохранено.\n"
+            f"ID заявки: {result['submission_id']}\n"
+            f"Статус: {status_text}"
         )
+        error_text = str(result.get("processing_error") or "").strip()
+        if error_text:
+            response_text += f"\nОшибка: {error_text}"
+        await message.answer(response_text, reply_markup=main_menu())
         await state.clear()
 
     @dp.message(GuestFlow.waiting_for_face_photo)

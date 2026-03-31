@@ -29,6 +29,9 @@ class GuestAccessLookup:
     valid_from: datetime
     valid_to: datetime
     qr_payload: dict[str, str | int]
+    face_profile_status: str
+    face_profile_quality_score: float | None
+    face_profile_error: str | None
 
 
 class TelegramGuestService:
@@ -198,6 +201,8 @@ class TelegramGuestService:
         return {
             "submission_id": submission.id,
             "status": submission.status,
+            "face_profile_status": self._normalize_face_profile_status(submission.status),
+            "quality_score": submission.face_quality_score,
             "processing_error": submission.processing_error or "",
         }
 
@@ -223,6 +228,14 @@ class TelegramGuestService:
         guest_name: str,
     ) -> GuestAccessLookup:
         qr_payload = self._qr_service.get_current_qr_payload(grant.door)
+        submission = self._latest_face_submission(reservation_id=grant.reservation_external_id)
+        face_profile_status = "missing"
+        face_profile_quality_score = None
+        face_profile_error = None
+        if submission is not None:
+            face_profile_status = self._normalize_face_profile_status(submission.status)
+            face_profile_quality_score = submission.face_quality_score
+            face_profile_error = submission.processing_error
         return GuestAccessLookup(
             reservation_external_id=grant.reservation_external_id,
             guest_name=guest_name,
@@ -233,7 +246,28 @@ class TelegramGuestService:
             valid_from=self._normalize_datetime(grant.valid_from),
             valid_to=self._normalize_datetime(grant.valid_to),
             qr_payload=qr_payload,
+            face_profile_status=face_profile_status,
+            face_profile_quality_score=face_profile_quality_score,
+            face_profile_error=face_profile_error,
         )
+
+    def _latest_face_submission(self, *, reservation_id: str) -> FacePhotoSubmissionModel | None:
+        return (
+            self._db.query(FacePhotoSubmissionModel)
+            .filter(FacePhotoSubmissionModel.reservation_external_id == reservation_id)
+            .order_by(FacePhotoSubmissionModel.created_at.desc())
+            .first()
+        )
+
+    @staticmethod
+    def _normalize_face_profile_status(status: str | None) -> str:
+        if status == "processed":
+            return "processed"
+        if status in {"received", "processing"}:
+            return "processing"
+        if status == "processing_failed":
+            return "failed"
+        return "missing"
 
     @staticmethod
     def _normalize_query(value: str) -> str:

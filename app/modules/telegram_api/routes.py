@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from aiogram.types import Update
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
@@ -10,6 +13,7 @@ from app.modules.telegram_api.service import TelegramGuestService
 from app.services.encryption import EncryptionService
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
+logger = logging.getLogger(__name__)
 
 
 def get_encryption_service(request: Request) -> EncryptionService:
@@ -48,6 +52,13 @@ def require_bot_api_key(
         )
 
 
+async def _dispatch_update(runtime, update: Update) -> None:
+    try:
+        await runtime.dispatcher.feed_update(runtime.bot, update)
+    except Exception:
+        logger.exception("Telegram webhook update processing failed")
+
+
 @router.post("/webhook")
 async def telegram_webhook(
     request: Request,
@@ -69,7 +80,7 @@ async def telegram_webhook(
 
     payload = await request.json()
     update = Update.model_validate(payload, context={"bot": runtime.bot})
-    await runtime.dispatcher.feed_update(runtime.bot, update)
+    asyncio.create_task(_dispatch_update(runtime, update))
     return {"ok": True}
 
 
