@@ -30,7 +30,7 @@ class SmartLockerTelegramApiClient:
         *,
         guest_query: str,
     ) -> dict:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
             response = await client.post(
                 f"{self._api_base_url}/api/v1/telegram/guest/bookings",
                 headers=self._headers,
@@ -44,7 +44,7 @@ class SmartLockerTelegramApiClient:
         *,
         telegram_chat_id: str,
     ) -> dict:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
             response = await client.post(
                 f"{self._api_base_url}/api/v1/telegram/guest/bindings",
                 headers=self._headers,
@@ -59,7 +59,7 @@ class SmartLockerTelegramApiClient:
         reservation_code: str,
         telegram_chat_id: str,
     ) -> dict:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
             response = await client.post(
                 f"{self._api_base_url}/api/v1/telegram/guest/bind",
                 headers=self._headers,
@@ -76,7 +76,7 @@ class SmartLockerTelegramApiClient:
         *,
         reservation_code: str,
     ) -> dict:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
             response = await client.post(
                 f"{self._api_base_url}/api/v1/telegram/guest/access",
                 headers=self._headers,
@@ -95,7 +95,7 @@ class SmartLockerTelegramApiClient:
         filename: str = "face.jpg",
         content_type: str = "image/jpeg",
     ) -> dict:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=60, trust_env=False) as client:
             response = await client.post(
                 f"{self._api_base_url}/api/v1/telegram/guest/face-photo",
                 headers=self._headers,

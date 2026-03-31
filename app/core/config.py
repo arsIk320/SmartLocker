@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_bot_api_key: str | None = None
     telegram_bot_api_base_url: str = "http://127.0.0.1:8000"
+    telegram_bot_api_internal_host: str | None = None
+    telegram_bot_api_internal_port: int | None = None
     telegram_proxy_url: str | None = None
 
 
