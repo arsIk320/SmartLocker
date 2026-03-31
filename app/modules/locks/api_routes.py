@@ -10,7 +10,7 @@ from starlette.requests import ClientDisconnect
 from app.core.config import Settings, get_settings
 from app.modules.access_logs.service import AccessAttemptLogService
 from app.modules.biometrics.face_map import FaceMapError
-from app.modules.biometrics.service import FaceVerificationService
+from app.modules.biometrics.service import FaceVerificationService, FaceVerificationUnavailableError
 from app.db import get_db
 from app.db.models import AccessGrantModel
 from app.modules.locks.qr_service import QrAccessService
@@ -196,6 +196,24 @@ async def verify_face_for_lock(
             "open_door": False,
             "door_uid": device.door.door_uid,
             "reason": "face_map_error",
+            "booking_code": reservation_external_id,
+            "error": str(exc),
+            "image_received": True,
+        }
+    except FaceVerificationUnavailableError as exc:
+        access_log_service.record_attempt(
+            owner_email=device.owner_email,
+            method="face",
+            source="lock_face",
+            result="denied",
+            reason=exc.code,
+            reservation_external_id=reservation_external_id,
+            door_uid=device.door.door_uid,
+        )
+        return {
+            "open_door": False,
+            "door_uid": device.door.door_uid,
+            "reason": exc.code,
             "booking_code": reservation_external_id,
             "error": str(exc),
             "image_received": True,

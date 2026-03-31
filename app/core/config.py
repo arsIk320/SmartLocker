@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env.example", "SmartLocker.env", ".local.env", ".env"),
+        env_file=(".env.example", ".env", "SmartLocker.env", ".local.env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     port: int = 8000
     database_url: str = "sqlite:///./smartlocker.db"
     smartlocker_api_base_url: str | None = None
+    provisioning_api_base_url: str | None = None
 
     jwt_secret_key: str = "local-dev-insecure-secret-change-before-production"
     jwt_algorithm: str = "HS256"
@@ -64,6 +65,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "smartlocker_api_base_url",
+        "provisioning_api_base_url",
         "travelline_client_id",
         "travelline_client_secret",
         "travelline_property_id",

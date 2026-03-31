@@ -897,13 +897,20 @@ class SmartLockerDesktopWindow(QMainWindow):
             if self.settings.smartlocker_api_base_url
             else None
         )
-        self.engine, self.session_factory = create_session_factory(self.settings.database_url)
-        init_db(self.engine, self.settings.database_url)
+        self.engine = None
+        self.session_factory = None
+        if self.api_client is None:
+            self.engine, self.session_factory = create_session_factory(self.settings.database_url)
+            init_db(self.engine, self.settings.database_url)
         self.encryption = EncryptionService(settings=self.settings)
-        self.auth_service = AuthService(
-            settings=self.settings,
-            session_factory=self.session_factory,
-            encryption=self.encryption,
+        self.auth_service = (
+            AuthService(
+                settings=self.settings,
+                session_factory=self.session_factory,
+                encryption=self.encryption,
+            )
+            if self.session_factory is not None
+            else None
         )
         self.serial_service = SerialProvisioningService()
         self.user = None
@@ -925,6 +932,8 @@ class SmartLockerDesktopWindow(QMainWindow):
     def server_base_url(self) -> str:
         if self.api_client is not None:
             return self.api_client.base_url.rstrip("/")
+        if self.settings.provisioning_api_base_url:
+            return self.settings.provisioning_api_base_url.rstrip("/")
         if self.settings.smartlocker_api_base_url:
             return self.settings.smartlocker_api_base_url.rstrip("/")
         host = self._detect_lan_ip()

@@ -7,9 +7,9 @@ from dataclasses import dataclass
 import numpy as np
 from sqlalchemy.orm import Session
 
-from app.db.models import AccessGrantModel, FacePhotoSubmissionModel
 from app.core.config import get_settings
-from app.modules.biometrics.face_map import FaceMapError, build_face_map_from_bytes
+from app.db.models import AccessGrantModel, FacePhotoSubmissionModel
+from app.modules.biometrics.face_map import build_face_map_from_bytes
 from app.services.encryption import EncryptionService
 
 
@@ -32,6 +32,12 @@ class FaceCompareResult:
     threshold: float
     stored_quality_score: float | None
     probe_quality_score: float | None
+
+
+class FaceVerificationUnavailableError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class FaceVerificationService:
@@ -87,21 +93,31 @@ class FaceVerificationService:
             .one_or_none()
         )
         if grant is None:
-            raise ValueError("Бронь для проверки не найдена.")
+            raise FaceVerificationUnavailableError(
+                "reservation_not_found",
+                "Reservation for face verification was not found.",
+            )
 
         submission = self._latest_submission(reservation_id=reservation_external_id)
         if submission is None or not submission.face_map_encrypted:
-            raise ValueError("Для этой брони ещё нет построенной карты лица.")
+            raise FaceVerificationUnavailableError(
+                "stored_face_map_missing",
+                "No stored face map is available for this reservation.",
+            )
         if submission.status != "processed":
-            raise ValueError("Карта лица для этой брони ещё не готова.")
+            raise FaceVerificationUnavailableError(
+                "stored_face_map_not_ready",
+                "Stored face map for this reservation is not processed yet.",
+            )
 
         stored_map = json.loads(self._encryption.decrypt(submission.face_map_encrypted))
         probe_map = build_face_map_from_bytes(image_bytes)
         probe_quality_score = float(probe_map["quality_score"])
         if min_probe_quality_score is not None and probe_quality_score < min_probe_quality_score:
-            raise ValueError(
+            raise FaceVerificationUnavailableError(
+                "probe_quality_too_low",
                 f"Live probe quality is too low. quality_score={probe_quality_score:.4f}, "
-                f"required>={min_probe_quality_score:.4f}"
+                f"required>={min_probe_quality_score:.4f}",
             )
 
         stored_embedding = np.array(stored_map["embedding"], dtype=np.float32)
@@ -132,9 +148,9 @@ class FaceVerificationService:
 
 def decode_data_url_image(image_data: str) -> bytes:
     if "," not in image_data:
-        raise ValueError("Некорректный формат снимка.")
+        raise ValueError("Invalid image payload format.")
     _, encoded = image_data.split(",", 1)
     try:
         return base64.b64decode(encoded)
     except Exception as exc:
-        raise ValueError("Не удалось декодировать снимок с камеры.") from exc
+        raise ValueError("Unable to decode image from camera.") from exc

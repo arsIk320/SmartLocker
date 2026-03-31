@@ -247,12 +247,12 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         data = await state.get_data()
         bookings = data.get("search_bookings", [])
         if not bookings:
-            await callback.answer("Список броней устарел. Начните заново.", show_alert=True)
+            await safe_callback_answer(callback, "Список броней устарел. Начните заново.", show_alert=True)
             return
 
         index = int(callback.data.split(":")[1])
         if index >= len(bookings):
-            await callback.answer("Эта бронь недоступна.", show_alert=True)
+            await safe_callback_answer(callback, "Эта бронь недоступна.", show_alert=True)
             return
 
         booking = bookings[index]
@@ -283,7 +283,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         bookings = data.get("bound_bookings", [])
         index = int(callback.data.split(":")[1])
         if index >= len(bookings):
-            await callback.answer("Эта бронь недоступна.", show_alert=True)
+            await safe_callback_answer(callback, "Эта бронь недоступна.", show_alert=True)
             return
 
         booking = bookings[index]
@@ -310,7 +310,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         bookings = data.get("bound_bookings", [])
         index = int(callback.data.split(":")[1])
         if index >= len(bookings):
-            await callback.answer("Эта бронь недоступна.", show_alert=True)
+            await safe_callback_answer(callback, "Эта бронь недоступна.", show_alert=True)
             return
 
         booking = bookings[index]
