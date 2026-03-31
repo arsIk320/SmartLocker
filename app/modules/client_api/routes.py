@@ -245,7 +245,12 @@ async def save_lock(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    api_base_url = str(request.base_url).rstrip("/")
+    settings = request.app.state.settings
+    api_base_url = (
+        str(settings.smartlocker_api_base_url).rstrip("/")
+        if settings.smartlocker_api_base_url
+        else str(request.base_url).rstrip("/")
+    )
     return {
         "device": lock_device_service.export_view(device),
         "provisioning": lock_device_service.export_provisioning_view(device, api_base_url=api_base_url),

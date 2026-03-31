@@ -6,6 +6,7 @@ from io import BytesIO
 import qrcode
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -26,6 +27,16 @@ class TelegramBotRuntime:
     settings: TelegramBotSettings
     bot: Bot
     dispatcher: Dispatcher
+
+
+async def safe_callback_answer(callback: CallbackQuery, *args, **kwargs) -> None:
+    try:
+        await callback.answer(*args, **kwargs)
+    except TelegramBadRequest as exc:
+        message = str(exc).lower()
+        if "query is too old" in message or "query id is invalid" in message:
+            return
+        raise
 
 
 def main_menu() -> InlineKeyboardMarkup:
@@ -103,7 +114,7 @@ async def send_menu(message: Message, text: str) -> None:
 
 async def send_menu_from_callback(callback: CallbackQuery, text: str) -> None:
     await callback.message.answer(text, reply_markup=main_menu())
-    await callback.answer()
+    await safe_callback_answer(callback)
 
 
 async def show_bound_bookings(
@@ -164,7 +175,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
     @dp.callback_query(F.data == "menu:help")
     async def menu_help(callback: CallbackQuery) -> None:
         await callback.message.answer(help_text(), reply_markup=main_menu())
-        await callback.answer()
+        await safe_callback_answer(callback)
 
     @dp.callback_query(F.data == "menu:bind")
     async def menu_bind(callback: CallbackQuery, state: FSMContext) -> None:
@@ -174,7 +185,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             "Введите ФИО, как в брони.\nПодойдёт полное ФИО или фамилия с именем.",
             reply_markup=back_to_menu(),
         )
-        await callback.answer()
+        await safe_callback_answer(callback)
 
     @dp.callback_query(F.data == "menu:qr")
     async def menu_qr(callback: CallbackQuery, state: FSMContext) -> None:
@@ -191,7 +202,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 f"Не удалось получить список броней: {exc}",
                 reply_markup=main_menu(),
             )
-        await callback.answer()
+        await safe_callback_answer(callback)
 
     @dp.callback_query(F.data == "menu:face")
     async def menu_face(callback: CallbackQuery, state: FSMContext) -> None:
@@ -208,7 +219,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 f"Не удалось получить список броней: {exc}",
                 reply_markup=main_menu(),
             )
-        await callback.answer()
+        await safe_callback_answer(callback)
 
     @dp.message(GuestFlow.waiting_for_binding_name)
     async def full_name(message: Message, state: FSMContext) -> None:
@@ -256,7 +267,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 reply_markup=main_menu(),
             )
             await state.clear()
-            await callback.answer()
+            await safe_callback_answer(callback)
             return
 
         await state.clear()
@@ -264,7 +275,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             f"Бронь {booking['reservation_external_id']} привязана к вашему Telegram.",
             reply_markup=main_menu(),
         )
-        await callback.answer("Бронь привязана")
+        await safe_callback_answer(callback, "Бронь привязана")
 
     @dp.callback_query(F.data.startswith("qr:"))
     async def qr_callback(callback: CallbackQuery, state: FSMContext) -> None:
@@ -286,12 +297,12 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 reply_markup=main_menu(),
             )
             await state.clear()
-            await callback.answer()
+            await safe_callback_answer(callback)
             return
 
         await state.clear()
         await send_access_card(callback.message, access_data)
-        await callback.answer()
+        await safe_callback_answer(callback)
 
     @dp.callback_query(F.data.startswith("face:"))
     async def face_callback(callback: CallbackQuery, state: FSMContext) -> None:
@@ -312,7 +323,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             "Отправьте одно фото лица сообщением Telegram.",
             reply_markup=back_to_menu(),
         )
-        await callback.answer()
+        await safe_callback_answer(callback)
 
     @dp.message(GuestFlow.waiting_for_face_photo, F.photo)
     async def face_photo(message: Message, state: FSMContext, bot: Bot) -> None:

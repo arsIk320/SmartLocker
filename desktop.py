@@ -923,6 +923,8 @@ class SmartLockerDesktopWindow(QMainWindow):
 
     @property
     def server_base_url(self) -> str:
+        if self.api_client is not None:
+            return self.api_client.base_url.rstrip("/")
         if self.settings.smartlocker_api_base_url:
             return self.settings.smartlocker_api_base_url.rstrip("/")
         host = self._detect_lan_ip()
