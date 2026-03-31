@@ -32,12 +32,12 @@ def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="рџ”ђ РњРѕРё QR-РєРѕРґС‹", callback_data="menu:qr"),
-                InlineKeyboardButton(text="рџ”— РџСЂРёРІСЏР·Р°С‚СЊ Р±СЂРѕРЅСЊ", callback_data="menu:bind"),
+                InlineKeyboardButton(text="Мои QR-коды", callback_data="menu:qr"),
+                InlineKeyboardButton(text="Привязать бронь", callback_data="menu:bind"),
             ],
             [
-                InlineKeyboardButton(text="рџ“ё Р¤РѕС‚Рѕ Р»РёС†Р°", callback_data="menu:face"),
-                InlineKeyboardButton(text="в„№пёЏ РџРѕРјРѕС‰СЊ", callback_data="menu:help"),
+                InlineKeyboardButton(text="Фото лица", callback_data="menu:face"),
+                InlineKeyboardButton(text="Помощь", callback_data="menu:help"),
             ],
         ]
     )
@@ -46,7 +46,7 @@ def main_menu() -> InlineKeyboardMarkup:
 def back_to_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="в¬…пёЏ РќР°Р·Р°Рґ РІ РјРµРЅСЋ", callback_data="menu:home")],
+            [InlineKeyboardButton(text="Назад в меню", callback_data="menu:home")],
         ]
     )
 
@@ -64,36 +64,36 @@ def build_qr_image(payload: str) -> BufferedInputFile:
 def guest_summary(data: dict) -> str:
     qr = data["qr_payload"]
     return (
-        f"Р‘СЂРѕРЅСЊ: {data['reservation_external_id']}\n"
-        f"Р“РѕСЃС‚СЊ: {data['guest_name']}\n"
-        f"РћР±СЉРµРєС‚: {data['house_name']}\n"
-        f"Р”РІРµСЂСЊ: {data['door_name']}\n"
-        f"UID РґРІРµСЂРё: {data['door_uid']}\n"
-        f"РњРµС‚РѕРґ РґРѕСЃС‚СѓРїР°: {data['method']}\n"
-        f"РЎРѕР·РґР°РЅ: {qr['issued_at']}\n"
-        f"Р”РµР№СЃС‚РІСѓРµС‚ РґРѕ: {qr['expires_at']}\n"
-        f"РћСЃС‚Р°Р»РѕСЃСЊ: {qr['ttl_seconds']} СЃРµРє.\n"
-        f"РљРѕРґ: {qr['code']}"
+        f"Бронь: {data['reservation_external_id']}\n"
+        f"Гость: {data['guest_name']}\n"
+        f"Объект: {data['house_name']}\n"
+        f"Дверь: {data['door_name']}\n"
+        f"UID двери: {data['door_uid']}\n"
+        f"Метод доступа: {data['method']}\n"
+        f"Создан: {qr['issued_at']}\n"
+        f"Действует до: {qr['expires_at']}\n"
+        f"Осталось: {qr['ttl_seconds']} сек.\n"
+        f"Код: {qr['code']}"
     )
 
 
 def help_text() -> str:
     return (
-        "РљР°Рє РїРѕР»СЊР·РѕРІР°С‚СЊСЃСЏ Р±РѕС‚РѕРј:\n"
-        "1. РќР°Р¶РјРёС‚Рµ В«рџ”— РџСЂРёРІСЏР·Р°С‚СЊ Р±СЂРѕРЅСЊВ» Рё РІРІРµРґРёС‚Рµ Р¤РРћ.\n"
-        "2. Р’С‹Р±РµСЂРёС‚Рµ СЃРІРѕСЋ Р±СЂРѕРЅСЊ РєРЅРѕРїРєРѕР№.\n"
-        "3. РџРѕС‚РѕРј РїРѕР»СѓС‡Р°Р№С‚Рµ QR С‡РµСЂРµР· В«рџ”ђ РњРѕРё QR-РєРѕРґС‹В».\n"
-        "4. Р¤РѕС‚Рѕ РґР»СЏ Р±РёРѕРјРµС‚СЂРёРё РјРѕР¶РЅРѕ РѕС‚РїСЂР°РІРёС‚СЊ С‡РµСЂРµР· В«рџ“ё Р¤РѕС‚Рѕ Р»РёС†Р°В».\n\n"
-        "РљР°Р¶РґС‹Р№ QR-РєРѕРґ РґРµР№СЃС‚РІСѓРµС‚ 1 С‡Р°СЃ СЃ РјРѕРјРµРЅС‚Р° РІС‹РґР°С‡Рё."
+        "Как пользоваться ботом:\n"
+        "1. Нажмите «Привязать бронь» и введите ФИО.\n"
+        "2. Выберите свою бронь кнопкой.\n"
+        "3. Потом получите QR через «Мои QR-коды».\n"
+        "4. Фото для биометрии можно отправить через «Фото лица».\n\n"
+        "Каждый QR-код действует 1 час с момента выдачи."
     )
 
 
 def bookings_keyboard(bookings: list[dict], action: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for index, booking in enumerate(bookings):
-        label = f"рџЏ  {booking['house_name']} вЂў рџљЄ {booking['door_name']}"
+        label = f"{booking['house_name']} • {booking['door_name']}"
         rows.append([InlineKeyboardButton(text=label[:64], callback_data=f"{action}:{index}")])
-    rows.append([InlineKeyboardButton(text="в¬…пёЏ РќР°Р·Р°Рґ РІ РјРµРЅСЋ", callback_data="menu:home")])
+    rows.append([InlineKeyboardButton(text="Назад в меню", callback_data="menu:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -117,20 +117,24 @@ async def show_bound_bookings(
     bookings = result["bookings"]
     if not bookings:
         await target_message.answer(
-            "РЈ РІР°СЃ РїРѕРєР° РЅРµС‚ РїСЂРёРІСЏР·Р°РЅРЅС‹С… Р±СЂРѕРЅРµР№. РЎРЅР°С‡Р°Р»Р° РЅР°Р¶РјРёС‚Рµ В«рџ”— РџСЂРёРІСЏР·Р°С‚СЊ Р±СЂРѕРЅСЊВ».",
+            "У вас пока нет привязанных броней. Сначала нажмите «Привязать бронь».",
             reply_markup=main_menu(),
         )
         return
 
     await state.update_data(bound_bookings=bookings)
-    prompt = "Р’С‹Р±РµСЂРёС‚Рµ Р±СЂРѕРЅСЊ РґР»СЏ QR-РєРѕРґР°:" if action == "qr" else "Р’С‹Р±РµСЂРёС‚Рµ Р±СЂРѕРЅСЊ РґР»СЏ РѕС‚РїСЂР°РІРєРё С„РѕС‚Рѕ:"
+    prompt = (
+        "Выберите бронь для QR-кода:"
+        if action == "qr"
+        else "Выберите бронь для отправки фото:"
+    )
     await target_message.answer(prompt, reply_markup=bookings_keyboard(bookings, action))
 
 
 async def send_access_card(message: Message, access_data: dict) -> None:
     qr_file = build_qr_image(access_data["qr_payload"]["code"])
     await message.answer(guest_summary(access_data), reply_markup=back_to_menu())
-    await message.answer_photo(qr_file, caption="рџ”ђ Р’Р°С€ QR-РєРѕРґ РґР»СЏ РґРІРµСЂРё", reply_markup=main_menu())
+    await message.answer_photo(qr_file, caption="Ваш QR-код для двери", reply_markup=main_menu())
 
 
 async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatcher:
@@ -142,7 +146,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         await state.clear()
         await send_menu(
             message,
-            "Р”РѕР±СЂРѕ РїРѕР¶Р°Р»РѕРІР°С‚СЊ РІ SmartLocker.\nР’С‹Р±РµСЂРёС‚Рµ РЅСѓР¶РЅРѕРµ РґРµР№СЃС‚РІРёРµ РєРЅРѕРїРєРѕР№ РЅРёР¶Рµ.",
+            "Добро пожаловать в SmartLocker.\nВыберите нужное действие кнопкой ниже.",
         )
 
     @dp.message(Command("help"))
@@ -154,7 +158,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         await state.clear()
         await send_menu_from_callback(
             callback,
-            "Р“Р»Р°РІРЅРѕРµ РјРµРЅСЋ SmartLocker. Р’С‹Р±РµСЂРёС‚Рµ РґРµР№СЃС‚РІРёРµ.",
+            "Главное меню SmartLocker. Выберите действие.",
         )
 
     @dp.callback_query(F.data == "menu:help")
@@ -167,7 +171,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         await state.clear()
         await state.set_state(GuestFlow.waiting_for_binding_name)
         await callback.message.answer(
-            "Р’РІРµРґРёС‚Рµ Р¤РРћ, РєР°Рє РІ Р±СЂРѕРЅРё.\nРџРѕРґРѕР№РґС‘С‚ РїРѕР»РЅРѕРµ Р¤РРћ РёР»Рё С„Р°РјРёР»РёСЏ СЃ РёРјРµРЅРµРј.",
+            "Введите ФИО, как в брони.\nПодойдёт полное ФИО или фамилия с именем.",
             reply_markup=back_to_menu(),
         )
         await callback.answer()
@@ -184,7 +188,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             )
         except Exception as exc:
             await callback.message.answer(
-                f"РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р±СЂРѕРЅРµР№: {exc}",
+                f"Не удалось получить список броней: {exc}",
                 reply_markup=main_menu(),
             )
         await callback.answer()
@@ -201,7 +205,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             )
         except Exception as exc:
             await callback.message.answer(
-                f"РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р±СЂРѕРЅРµР№: {exc}",
+                f"Не удалось получить список броней: {exc}",
                 reply_markup=main_menu(),
             )
         await callback.answer()
@@ -210,20 +214,20 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
     async def full_name(message: Message, state: FSMContext) -> None:
         guest_query = (message.text or "").strip()
         if not guest_query:
-            await message.answer("РќСѓР¶РЅРѕ РІРІРµСЃС‚Рё Р¤РРћ С‚РµРєСЃС‚РѕРј.", reply_markup=back_to_menu())
+            await message.answer("Нужно ввести ФИО текстом.", reply_markup=back_to_menu())
             return
 
         try:
             result = await api_client.search_guest_bookings(guest_query=guest_query)
         except Exception as exc:
-            await message.answer(f"РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё Р±СЂРѕРЅРё: {exc}", reply_markup=main_menu())
+            await message.answer(f"Не удалось найти брони: {exc}", reply_markup=main_menu())
             await state.clear()
             return
 
         bookings = result["bookings"]
         await state.update_data(search_bookings=bookings, guest_query=guest_query)
         await message.answer(
-            "Р’С‹Р±РµСЂРёС‚Рµ РІР°С€Сѓ Р±СЂРѕРЅСЊ:",
+            "Выберите вашу бронь:",
             reply_markup=bookings_keyboard(bookings, "bind"),
         )
 
@@ -232,12 +236,12 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         data = await state.get_data()
         bookings = data.get("search_bookings", [])
         if not bookings:
-            await callback.answer("РЎРїРёСЃРѕРє Р±СЂРѕРЅРµР№ СѓСЃС‚Р°СЂРµР». РќР°С‡РЅРёС‚Рµ Р·Р°РЅРѕРІРѕ.", show_alert=True)
+            await callback.answer("Список броней устарел. Начните заново.", show_alert=True)
             return
 
         index = int(callback.data.split(":")[1])
         if index >= len(bookings):
-            await callback.answer("Р­С‚Р° Р±СЂРѕРЅСЊ РЅРµРґРѕСЃС‚СѓРїРЅР°.", show_alert=True)
+            await callback.answer("Эта бронь недоступна.", show_alert=True)
             return
 
         booking = bookings[index]
@@ -247,17 +251,20 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 telegram_chat_id=str(callback.message.chat.id),
             )
         except Exception as exc:
-            await callback.message.answer(f"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРёРІСЏР·Р°С‚СЊ Р±СЂРѕРЅСЊ: {exc}", reply_markup=main_menu())
+            await callback.message.answer(
+                f"Не удалось привязать бронь: {exc}",
+                reply_markup=main_menu(),
+            )
             await state.clear()
             await callback.answer()
             return
 
         await state.clear()
         await callback.message.answer(
-            f"вњ… Р‘СЂРѕРЅСЊ {booking['reservation_external_id']} РїСЂРёРІСЏР·Р°РЅР° Рє РІР°С€РµРјСѓ Telegram.",
+            f"Бронь {booking['reservation_external_id']} привязана к вашему Telegram.",
             reply_markup=main_menu(),
         )
-        await callback.answer("Р‘СЂРѕРЅСЊ РїСЂРёРІСЏР·Р°РЅР°")
+        await callback.answer("Бронь привязана")
 
     @dp.callback_query(F.data.startswith("qr:"))
     async def qr_callback(callback: CallbackQuery, state: FSMContext) -> None:
@@ -265,7 +272,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         bookings = data.get("bound_bookings", [])
         index = int(callback.data.split(":")[1])
         if index >= len(bookings):
-            await callback.answer("Р­С‚Р° Р±СЂРѕРЅСЊ РЅРµРґРѕСЃС‚СѓРїРЅР°.", show_alert=True)
+            await callback.answer("Эта бронь недоступна.", show_alert=True)
             return
 
         booking = bookings[index]
@@ -274,7 +281,10 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 reservation_code=booking["reservation_external_id"],
             )
         except Exception as exc:
-            await callback.message.answer(f"РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РґРѕСЃС‚СѓРї: {exc}", reply_markup=main_menu())
+            await callback.message.answer(
+                f"Не удалось получить доступ: {exc}",
+                reply_markup=main_menu(),
+            )
             await state.clear()
             await callback.answer()
             return
@@ -289,7 +299,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         bookings = data.get("bound_bookings", [])
         index = int(callback.data.split(":")[1])
         if index >= len(bookings):
-            await callback.answer("Р­С‚Р° Р±СЂРѕРЅСЊ РЅРµРґРѕСЃС‚СѓРїРЅР°.", show_alert=True)
+            await callback.answer("Эта бронь недоступна.", show_alert=True)
             return
 
         booking = bookings[index]
@@ -299,7 +309,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
         )
         await state.set_state(GuestFlow.waiting_for_face_photo)
         await callback.message.answer(
-            "рџ“ё РћС‚РїСЂР°РІСЊС‚Рµ РѕРґРЅРѕ С„РѕС‚Рѕ Р»РёС†Р° СЃРѕРѕР±С‰РµРЅРёРµРј Telegram.",
+            "Отправьте одно фото лица сообщением Telegram.",
             reply_markup=back_to_menu(),
         )
         await callback.answer()
@@ -318,12 +328,15 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
                 content=content.read(),
             )
         except Exception as exc:
-            await message.answer(f"РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ С„РѕС‚Рѕ: {exc}", reply_markup=main_menu())
+            await message.answer(
+                f"Не удалось отправить фото: {exc}",
+                reply_markup=main_menu(),
+            )
             await state.clear()
             return
 
         await message.answer(
-            f"вњ… Р¤РѕС‚Рѕ РїРѕР»СѓС‡РµРЅРѕ Рё СЃРѕС…СЂР°РЅРµРЅРѕ.\nID Р·Р°СЏРІРєРё: {result['submission_id']}\nРЎС‚Р°С‚СѓСЃ: {result['status']}",
+            f"Фото получено и сохранено.\nID заявки: {result['submission_id']}\nСтатус: {result['status']}",
             reply_markup=main_menu(),
         )
         await state.clear()
@@ -331,7 +344,7 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
     @dp.message(GuestFlow.waiting_for_face_photo)
     async def face_photo_invalid(message: Message) -> None:
         await message.answer(
-            "РќСѓР¶РЅРѕ РѕС‚РїСЂР°РІРёС‚СЊ РёРјРµРЅРЅРѕ С„РѕС‚Рѕ СЃРѕРѕР±С‰РµРЅРёРµРј Telegram.",
+            "Нужно отправить именно фото сообщением Telegram.",
             reply_markup=back_to_menu(),
         )
 
