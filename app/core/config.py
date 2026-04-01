@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     telegram_bot_webhook_base_url: str | None = None
     telegram_bot_webhook_secret: str | None = None
     telegram_proxy_url: str | None = None
+    max_bot_token: str | None = None
+    max_bot_api_key: str | None = None
+    max_bot_api_base_url: str = "http://127.0.0.1:8000"
+    max_platform_api_base_url: str = "https://platform-api.max.ru"
+    max_bot_poll_timeout: int = 30
 
     @field_validator(
         "smartlocker_api_base_url",
@@ -82,6 +87,8 @@ class Settings(BaseSettings):
         "telegram_bot_webhook_base_url",
         "telegram_bot_webhook_secret",
         "telegram_proxy_url",
+        "max_bot_token",
+        "max_bot_api_key",
         mode="before",
     )
     @classmethod

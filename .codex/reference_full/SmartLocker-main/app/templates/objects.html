@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="dashboard-top">
+    <div>
+        <span class="eyebrow">Объекты</span>
+        <h2>Дом -> Дверь -> Замок</h2>
+        <p>Здесь хранится структура объекта, связь двери с TravelLine unit и ручная привязка конкретного замка по его UID.</p>
+    </div>
+    <a class="btn ghost" href="/dashboard">Вернуться в dashboard</a>
+</section>
+
+{% if request.query_params.get("success") %}
+<div class="alert success">{{ request.query_params.get("success") }}</div>
+{% endif %}
+
+{% if request.query_params.get("error") %}
+<div class="alert error">{{ request.query_params.get("error") }}</div>
+{% endif %}
+
+<section class="grid dashboard-layout">
+    <article class="panel">
+        <div class="section-head">
+            <div>
+                <span class="eyebrow">Новый объект</span>
+                <h3>Добавить дом</h3>
+            </div>
+        </div>
+        <form method="post" action="/dashboard/houses" class="form-grid compact-form">
+            <label>
+                <span>Название дома</span>
+                <input type="text" name="name" value="{{ house_form.name }}" placeholder="Дом на Петровке" required>
+            </label>
+            <label>
+                <span>Адрес</span>
+                <input type="text" name="address" value="{{ house_form.address }}" placeholder="Москва, Петровка 12" required>
+            </label>
+            <button class="btn primary" type="submit">Добавить дом</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="section-head">
+            <div>
+                <span class="eyebrow">Новая дверь</span>
+                <h3>Добавить дверь в дом</h3>
+            </div>
+        </div>
+        <form method="post" action="/dashboard/doors" class="form-grid compact-form">
+            <label>
+                <span>Дом</span>
+                <select name="house_id" required>
+                    <option value="">Выберите дом</option>
+                    {% for house in houses %}
+                    <option value="{{ house.id }}">{{ house.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Название двери</span>
+                <input type="text" name="name" value="{{ door_form.name }}" placeholder="Входная дверь" required>
+            </label>
+            <label>
+                <span>Замок / контроллер</span>
+                <input type="text" name="lock_label" value="{{ door_form.lock_label }}" placeholder="ESP32-CAM #1" required>
+            </label>
+            <label>
+                <span>TravelLine unit ID</span>
+                <input type="text" name="travelline_unit_id" value="{{ door_form.travelline_unit_id }}" placeholder="392713">
+            </label>
+            <button class="btn primary" type="submit">Добавить дверь</button>
+        </form>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <span class="eyebrow">Структура</span>
+            <h3>Все добавленные дома и двери</h3>
+        </div>
+    </div>
+    <div class="house-list">
+        {% for house in houses %}
+        <article class="house-card">
+            <div class="house-head">
+                <div>
+                    <h4>{{ house.name }}</h4>
+                    <p>{{ house.address }}</p>
+                </div>
+                <span class="pill">{{ house.doors|length }} дверей</span>
+            </div>
+
+            <div class="door-stack">
+                {% for door in house.doors %}
+                <div class="door-row door-row-stacked">
+                    <div class="door-main">
+                        <strong>{{ door.name }}</strong>
+                        <span>ID двери: {{ door.door_uid }}</span>
+                        <span>{{ door.lock_label }}</span>
+                        <span>TravelLine unit: {{ door.travelline_unit_id or "не привязан" }}</span>
+                        {% if door.lock_uid %}
+                        <span>UID замка: {{ door.lock_uid }}</span>
+                        {% else %}
+                        <span>UID замка пока не привязан</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="door-bind-state">
+                        {% if door.lock_uid %}
+                        <span class="pill">Замок привязан</span>
+                        {% else %}
+                        <span class="pill">Ожидает привязки</span>
+                        {% endif %}
+                    </div>
+
+                    <form method="post" action="/dashboard/doors/{{ door.id }}/bind-lock" class="door-bind-form">
+                        <label class="door-bind-field">
+                            <span>UID замка</span>
+                            <input
+                                class="door-bind-input"
+                                type="text"
+                                name="lock_uid"
+                                value="{{ door.lock_uid or '' }}"
+                                placeholder="Например, A1B2C3D4E5"
+                                required
+                            >
+                        </label>
+                        <button class="btn primary small" type="submit">
+                            {% if door.lock_uid %}Сменить привязку{% else %}Привязать замок{% endif %}
+                        </button>
+                    </form>
+                </div>
+                {% else %}
+                <div class="empty-card">У этого дома ещё нет дверей.</div>
+                {% endfor %}
+            </div>
+        </article>
+        {% else %}
+        <div class="empty-card">Пока не добавлено ни одного дома. Начните с первого объекта.</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

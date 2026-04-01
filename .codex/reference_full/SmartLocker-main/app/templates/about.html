@@ -1,0 +1,27 @@
+{% extends "base_public.html" %}
+{% block content %}
+<section class="public-page">
+    <div class="page-intro">
+        <span class="eyebrow">О проекте</span>
+        <h1>SmartLocker как реальная платформа, а не прототип</h1>
+        <p>Мы строим SaaS для бесконтактного заселения с умными замками, PMS-интеграциями, контролем доступа и биометрическим контуром. Продукт рассчитан на реальное использование, поэтому проектируется с прицелом на безопасность, юридические требования и устойчивую архитектуру.</p>
+    </div>
+    <div class="story-grid">
+        <article class="story-panel">
+            <span class="eyebrow">Что входит</span>
+            <h2>Единая экосистема доступа</h2>
+            <ul class="status-list">
+                <li>Управление объектами, дверями и замками</li>
+                <li>Интеграции с TravelLine и другими PMS</li>
+                <li>QR, PIN, удалённое открытие и face access</li>
+                <li>Журналы событий, роли и аудит действий</li>
+            </ul>
+        </article>
+        <article class="story-panel dark">
+            <span class="eyebrow">Архитектура</span>
+            <h2>Backend + UI + IoT</h2>
+            <p>Backend строится на FastAPI, слой PMS уже получает бронирования из TravelLine, а фронтенд формируется как единый интерфейс для владельца, администратора и будущего устройства.</p>
+        </article>
+    </div>
+</section>
+{% endblock %}

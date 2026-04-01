@@ -1,0 +1,114 @@
+{% extends "base_public.html" %}
+{% block content %}
+<section class="public-hero">
+    <div class="hero-copy">
+        <span class="hero-kicker">Платформа бесконтактного заселения</span>
+        <h1>Умный доступ для отелей, домов и апартаментов</h1>
+        <p>
+            SmartLocker объединяет PMS-интеграции, управление замками, гостевой доступ,
+            биометрию и контроль событий в одном интерфейсе. Это не прототип страницы,
+            а старт продуктовой оболочки для реального сервиса.
+        </p>
+        <div class="hero-actions">
+            <a class="btn primary" href="/register">Создать аккаунт</a>
+            <a class="btn ghost light" href="/login">Уже есть доступ</a>
+        </div>
+        <div class="hero-inline-stats">
+            <div>
+                <strong>TravelLine</strong>
+                <span>PMS уже подключён</span>
+            </div>
+            <div>
+                <strong>PIN / QR / Face</strong>
+                <span>Каналы доступа</span>
+            </div>
+            <div>
+                <strong>ESP8266 / Nano / ESP32-CAM</strong>
+                <span>Контур замка</span>
+            </div>
+        </div>
+    </div>
+    <div class="hero-visual">
+        <div class="signal-card large">
+            <span>Активный модуль</span>
+            <strong>TravelLine Sync</strong>
+            <p>Живые бронирования уже подтягиваются в SmartLocker и готовы к привязке к дверям.</p>
+        </div>
+        <div class="signal-grid">
+            <div class="signal-card">
+                <span>Доступы</span>
+                <strong>QR / PIN / Face</strong>
+            </div>
+            <div class="signal-card">
+                <span>Безопасность</span>
+                <strong>Audit + Consent</strong>
+            </div>
+            <div class="signal-card accent">
+                <span>IoT</span>
+                <strong>Lock API Draft</strong>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="feature-band">
+    <article class="feature-card">
+        <span class="feature-label">Для владельца</span>
+        <h3>Объекты, двери, замки</h3>
+        <p>Подключение PMS, привязка unit к двери и управление доступом гостей по сценариям заселения.</p>
+    </article>
+    <article class="feature-card">
+        <span class="feature-label">Для гостя</span>
+        <h3>Быстрый вход без ресепшена</h3>
+        <p>Код, QR и биометрия в одном потоке с прозрачной логикой подтверждения и контроля доступа.</p>
+    </article>
+    <article class="feature-card">
+        <span class="feature-label">Для проекта</span>
+        <h3>Защита данных по умолчанию</h3>
+        <p>Роли, журналы событий, почтовая верификация, изоляция чувствительных данных и подготовка к требованиям РФ.</p>
+    </article>
+</section>
+
+<section class="story-grid">
+    <article class="story-panel">
+        <span class="eyebrow">Как это работает</span>
+        <h2>От брони до открытия двери</h2>
+        <ol class="story-list">
+            <li>Бронь приходит из PMS в SmartLocker.</li>
+            <li>Система находит привязанный объект, дверь и замок.</li>
+            <li>Гость получает инструкции, код, QR и сценарий фото-верификации.</li>
+            <li>В день заезда доступ проверяется и дверь открывается по разрешённому методу.</li>
+        </ol>
+    </article>
+    <article class="story-panel dark">
+        <span class="eyebrow">Что в разработке сейчас</span>
+        <h2>Сегодняшний фокус</h2>
+        <ul class="status-list">
+            <li><strong>Интерфейс:</strong> вход, регистрация, кабинеты, продуктовая витрина</li>
+            <li><strong>Auth:</strong> email-коды, восстановление пароля, базовые роли</li>
+            <li><strong>PMS:</strong> TravelLine Read Reservation API</li>
+            <li><strong>Дальше:</strong> БД, face map и контур замка</li>
+        </ul>
+    </article>
+</section>
+
+<section class="news-section">
+    <div class="section-head public">
+        <div>
+            <span class="eyebrow">Новости проекта</span>
+            <h2>Текущее состояние разработки</h2>
+        </div>
+    </div>
+    <div class="news-timeline">
+        {% for item in news %}
+        <article class="timeline-card">
+            <div class="timeline-dot"></div>
+            <div>
+                <h3>{{ item.title }}</h3>
+                <p>{{ item.text }}</p>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

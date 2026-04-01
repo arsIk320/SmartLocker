@@ -50,6 +50,9 @@ def apply_local_defaults() -> None:
         "EMAIL_DELIVERY_MODE": "console",
         "EMAIL_FROM_NAME": "SmartLocker",
         "TELEGRAM_BOT_API_BASE_URL": "http://127.0.0.1:8000",
+        "MAX_BOT_API_BASE_URL": "http://127.0.0.1:8000",
+        "MAX_PLATFORM_API_BASE_URL": "https://platform-api.max.ru",
+        "MAX_BOT_POLL_TIMEOUT": "30",
     }
     for key, value in defaults.items():
         os.environ.setdefault(key, value)
@@ -83,6 +86,10 @@ def run_setup_wizard() -> None:
     )
     configure_telegram = (
         input("Настроить Telegram-бота сейчас? [y/N]: ").strip().lower()
+        in {"y", "yes", "да"}
+    )
+    configure_max = (
+        input("Настроить MAX-бота сейчас? [y/N]: ").strip().lower()
         in {"y", "yes", "да"}
     )
 
@@ -185,6 +192,30 @@ def run_setup_wizard() -> None:
             os.getenv("TELEGRAM_BOT_API_BASE_URL", "http://127.0.0.1:8000"),
         )
 
+    if configure_max:
+        values["MAX_BOT_TOKEN"] = prompt_value(
+            "MAX_BOT_TOKEN",
+            os.getenv("MAX_BOT_TOKEN", ""),
+            secret=True,
+        )
+        values["MAX_BOT_API_KEY"] = prompt_value(
+            "MAX_BOT_API_KEY",
+            os.getenv("MAX_BOT_API_KEY", ""),
+            secret=True,
+        )
+        values["MAX_BOT_API_BASE_URL"] = prompt_value(
+            "MAX_BOT_API_BASE_URL",
+            os.getenv("MAX_BOT_API_BASE_URL", "http://127.0.0.1:8000"),
+        )
+        values["MAX_PLATFORM_API_BASE_URL"] = prompt_value(
+            "MAX_PLATFORM_API_BASE_URL",
+            os.getenv("MAX_PLATFORM_API_BASE_URL", "https://platform-api.max.ru"),
+        )
+        values["MAX_BOT_POLL_TIMEOUT"] = prompt_value(
+            "MAX_BOT_POLL_TIMEOUT",
+            os.getenv("MAX_BOT_POLL_TIMEOUT", "30"),
+        )
+
     if values:
         save_local_env(values)
         for key, value in values.items():
@@ -216,6 +247,12 @@ def print_startup_info() -> None:
         print("- TravelLine: optional global credentials not fully set")
     if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_BOT_API_KEY"):
         print(f"- Telegram bot API base: {os.environ.get('TELEGRAM_BOT_API_BASE_URL', 'http://127.0.0.1:8000')}")
+    if os.getenv("MAX_BOT_TOKEN") and os.getenv("MAX_BOT_API_KEY"):
+        print(f"- MAX bot API base: {os.environ.get('MAX_BOT_API_BASE_URL', 'http://127.0.0.1:8000')}")
+        print(
+            f"- MAX platform API base: "
+            f"{os.environ.get('MAX_PLATFORM_API_BASE_URL', 'https://platform-api.max.ru')}"
+        )
 
 
 def main() -> None:

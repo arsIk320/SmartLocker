@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-screen">
+    <div class="auth-card compact">
+        <div class="panel-head">
+            <span class="eyebrow">Вход</span>
+            <h2>Войдите в SmartLocker</h2>
+            <p>Владелец объекта и администратор используют один защищённый вход.</p>
+        </div>
+        {% if error %}
+        <div class="alert error">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/login" class="form-grid">
+            <label>
+                <span>Email</span>
+                <input type="email" name="email" value="{{ form.email }}" placeholder="name@example.com" required>
+            </label>
+            <label>
+                <span>Пароль</span>
+                <div class="password-field">
+                    <input id="login-password" type="password" name="password" value="{{ form.password }}" placeholder="Введите пароль" required>
+                    <button class="password-toggle" type="button" data-target="login-password" aria-label="Показать пароль">👁</button>
+                </div>
+            </label>
+            <button class="btn primary" type="submit">Войти</button>
+        </form>
+        <div class="auth-links">
+            <a href="/register">Создать аккаунт</a>
+            <a href="/forgot-password">Сбросить пароль</a>
+        </div>
+    </div>
+</section>
+<script src="/static/app.js"></script>
+{% endblock %}

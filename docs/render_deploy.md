@@ -4,6 +4,7 @@ This project can run on Render as a single public web service:
 
 - `smartlocker-api`: FastAPI app on Render
 - Telegram bot runs inside the same app through a webhook endpoint
+- MAX bot can use the same API as a separate polling process
 - PostgreSQL lives on Neon
 
 ## Why this works
@@ -57,6 +58,7 @@ Optional, depending on your setup:
 
 - TravelLine credentials
 - SMTP / Brevo credentials
+- `MAX_BOT_API_KEY` if you want the MAX bot to call the API
 
 ## Deploy flow
 

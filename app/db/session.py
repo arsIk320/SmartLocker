@@ -56,29 +56,12 @@ def create_session_factory(database_url: str) -> tuple[Engine, sessionmaker[Sess
 
 def init_db(engine: Engine, database_url: str | None = None) -> None:
     if database_url and ("neon.tech" in database_url or "pooler.supabase.com" in database_url):
-        if _has_existing_remote_schema(database_url):
-            return
         _bootstrap_neon_schema(database_url)
+        _apply_compat_migrations(engine)
         return
 
     Base.metadata.create_all(bind=engine)
     _apply_compat_migrations(engine)
-
-
-def _has_existing_remote_schema(database_url: str) -> bool:
-    raw_url = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
-    with psycopg.connect(raw_url) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                select table_name
-                from information_schema.tables
-                where table_schema = 'public'
-                  and table_name in ('auth_users', 'doors', 'access_grants')
-                limit 1
-                """
-            )
-            return cursor.fetchone() is not None
 
 
 def _bootstrap_neon_schema(database_url: str) -> None:
@@ -99,7 +82,11 @@ def _bootstrap_neon_schema(database_url: str) -> None:
                     create_index_sql = str(CreateIndex(index).compile(dialect=dialect))
                     try:
                         cursor.execute(create_index_sql)
-                    except (psycopg.errors.DuplicateTable, psycopg.errors.DuplicateObject):
+                    except (
+                        psycopg.errors.DuplicateTable,
+                        psycopg.errors.DuplicateObject,
+                        psycopg.errors.UndefinedColumn,
+                    ):
                         pass
 
 
@@ -222,6 +209,14 @@ def _apply_compat_migrations(engine: Engine) -> None:
             connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN processing_error TEXT"))
         if "processed_at" not in face_columns:
             connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN processed_at TIMESTAMP"))
+        if "max_user_id" not in face_columns:
+            connection.execute(text("ALTER TABLE face_photo_submissions ADD COLUMN max_user_id VARCHAR(64)"))
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_face_photo_submissions_max_user_id "
+                "ON face_photo_submissions (max_user_id)"
+            )
+        )
 
     if "telegram_guest_bindings" not in table_names:
         return

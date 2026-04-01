@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-screen">
+    <div class="auth-card compact">
+        <div class="panel-head">
+            <span class="eyebrow">Подтверждение</span>
+            <h2>Подтвердите email кодом</h2>
+            <p>Введите код из письма, чтобы завершить регистрацию и открыть кабинет.</p>
+        </div>
+        {% if error %}
+        <div class="alert error">{{ error }}</div>
+        {% else %}
+        <div class="alert info">Код отправлен на указанный email. Если письмо не пришло, проверьте папку “Спам”.</div>
+        {% endif %}
+        <form method="post" action="/verify" class="form-grid">
+            <label>
+                <span>Email</span>
+                <input type="email" name="email" value="{{ form.email }}" required>
+            </label>
+            <label>
+                <span>Код подтверждения</span>
+                <input type="text" name="code" value="{{ form.code }}" placeholder="123456" required>
+            </label>
+            <button class="btn primary" type="submit">Подтвердить email</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

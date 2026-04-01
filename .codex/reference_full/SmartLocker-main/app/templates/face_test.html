@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <p class="section-kicker">БИОМЕТРИЯ</p>
+            <h2>Тест сравнения лица</h2>
+        </div>
+    </div>
+    <p class="muted-copy">Страница берёт кадр с камеры ПК и сравнивает его с уже построенной картой лица по выбранной брони.</p>
+
+    {% if error %}
+    <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+    <div class="panel inner-panel {% if result.match %}success-panel{% else %}warn-panel{% endif %}">
+        <strong>{% if result.match %}Совпадение найдено{% else %}Совпадение не найдено{% endif %}</strong>
+        <p>Гость: {{ result.guest_name }}</p>
+        <p>Бронь: {{ result.reservation_external_id }}</p>
+        <p>Distance: {{ result.distance }}</p>
+        <p>Confidence: {{ result.confidence }}</p>
+        <p>Порог: {{ result.threshold }}</p>
+        <p>Качество сохранённой карты: {{ result.stored_quality_score }}</p>
+        <p>Качество текущего снимка: {{ result.probe_quality_score }}</p>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/face-test" class="stack-form" id="face-test-form">
+        <label for="reservation_external_id">Профиль для сравнения</label>
+        <select id="reservation_external_id" name="reservation_external_id" class="input" required>
+            <option value="">Выберите бронь</option>
+            {% for profile in profiles %}
+            <option value="{{ profile.reservation_external_id }}" {% if form.reservation_external_id == profile.reservation_external_id %}selected{% endif %}>
+                {{ profile.guest_name }} | {{ profile.reservation_external_id }} | {{ profile.status }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <label for="camera-device">Камера</label>
+        <select id="camera-device" class="input"></select>
+
+        <div class="camera-shell">
+            <video id="camera-stream" class="camera-stream" autoplay playsinline muted></video>
+            <canvas id="camera-canvas" class="camera-stream hidden"></canvas>
+        </div>
+
+        <input type="hidden" id="image_data" name="image_data" value="{{ form.image_data }}">
+
+        <div class="inline-actions">
+            <button type="button" class="btn ghost" id="camera-start">Включить камеру</button>
+            <button type="button" class="btn ghost" id="camera-capture">Сделать снимок</button>
+            <button type="submit" class="btn">Сравнить</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <p class="section-kicker">ЖУРНАЛ</p>
+            <h2>Последние 100 попыток по лицу</h2>
+        </div>
+    </div>
+    <div class="grant-grid">
+        {% for entry in recent_access_logs %}
+        <article class="grant-card">
+            <div class="overview-head">
+                <strong>{{ entry.result }}</strong>
+                <span class="pill">{{ entry.source }}</span>
+            </div>
+            <span>Причина: {{ entry.reason }}</span>
+            <span>Время: {{ entry.created_at }}</span>
+            <span>Гость: {{ entry.guest_name or "—" }}</span>
+            <span>Бронь: {{ entry.reservation_external_id or "—" }}</span>
+            <span>Distance: {{ entry.distance if entry.distance is not none else "—" }}</span>
+            <span>Confidence: {{ entry.confidence if entry.confidence is not none else "—" }}</span>
+            <span>Порог: {{ entry.threshold if entry.threshold is not none else "—" }}</span>
+            <span>Качество live: {{ entry.probe_quality_score if entry.probe_quality_score is not none else "—" }}</span>
+        </article>
+        {% else %}
+        <div class="empty-card">Пока нет попыток сравнения.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<script>
+(() => {
+    const video = document.getElementById("camera-stream");
+    const canvas = document.getElementById("camera-canvas");
+    const imageDataInput = document.getElementById("image_data");
+    const cameraSelect = document.getElementById("camera-device");
+    const startButton = document.getElementById("camera-start");
+    const captureButton = document.getElementById("camera-capture");
+    let stream = null;
+
+    async function loadCameras() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter((device) => device.kind === "videoinput");
+        cameraSelect.innerHTML = "";
+        cameras.forEach((camera, index) => {
+            const option = document.createElement("option");
+            option.value = camera.deviceId;
+            option.textContent = camera.label || `Камера ${index + 1}`;
+            cameraSelect.appendChild(option);
+        });
+    }
+
+    async function startCamera() {
+        if (stream) {
+            stream.getTracks().forEach((track) => track.stop());
+        }
+        const selectedDeviceId = cameraSelect.value;
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "user" },
+            audio: false
+        });
+        video.srcObject = stream;
+        video.classList.remove("hidden");
+        canvas.classList.add("hidden");
+    }
+
+    function captureFrame() {
+        if (!video.videoWidth || !video.videoHeight) {
+            alert("Сначала включите камеру и дождитесь изображения.");
+            return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext("2d");
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        imageDataInput.value = canvas.toDataURL("image/jpeg", 0.92);
+        canvas.classList.remove("hidden");
+        video.classList.add("hidden");
+    }
+
+    startButton.addEventListener("click", async () => {
+        try {
+            await startCamera();
+        } catch (error) {
+            alert("Не удалось получить доступ к камере: " + error);
+        }
+    });
+
+    captureButton.addEventListener("click", () => {
+        captureFrame();
+    });
+
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then((permissionStream) => {
+            permissionStream.getTracks().forEach((track) => track.stop());
+            return loadCameras();
+        })
+        .catch(() => {});
+})();
+</script>
+{% endblock %}

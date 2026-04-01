@@ -1,0 +1,14 @@
+.env
+.local.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+smartlocker.db
+build/
+dist/
+*.spec
+SmartLocker.env
+*.local

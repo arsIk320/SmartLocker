@@ -1,0 +1,32 @@
+[project]
+name = "smartlocker"
+version = "0.1.0"
+description = "SmartLocker backend for smart lock and PMS integrations"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cryptography>=43,<45",
+    "fastapi>=0.115,<1.0",
+    "httpx>=0.28,<1.0",
+    "jinja2>=3.1,<4.0",
+    "numpy>=1.26,<3.0",
+    "Pillow>=10,<12",
+    "qrcode>=8.2,<9.0",
+    "aiogram>=3.22,<4.0",
+    "aiohttp-socks>=0.10,<1.0",
+    "pydantic-settings>=2.8,<3.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "PyQt6>=6.10,<7.0",
+    "pyserial>=3.5,<4.0",
+    "python-jose[cryptography]>=3.3,<4.0",
+    "python-multipart>=0.0.9,<1.0",
+    "sqlalchemy>=2.0,<3.0",
+    "uvicorn[standard]>=0.34,<1.0",
+]
+
+[project.scripts]
+smartlocker-desktop = "desktop:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

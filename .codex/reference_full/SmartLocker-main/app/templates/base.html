@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} | SmartLocker</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="app-body">
+    <header class="app-header">
+        <a class="public-brand dark" href="/">
+            <span class="brand-mark">SL</span>
+            <span>SmartLocker</span>
+        </a>
+        <nav class="app-nav">
+            {% if user and user.role != "admin" %}
+            <a href="/dashboard">Dashboard</a>
+            <a href="/objects">Objects</a>
+            <a href="/face-test">Face Test</a>
+            {% elif user and user.role == "admin" %}
+            <a href="/admin/dashboard">Admin</a>
+            {% endif %}
+        </nav>
+        <div class="app-header-right">
+            {% if user %}
+            <span class="app-user">{{ user.full_name }}</span>
+            <a class="btn ghost" href="/logout">Выйти</a>
+            {% else %}
+            <a class="btn ghost" href="/login">Войти</a>
+            <a class="btn ghost" href="/register">Регистрация</a>
+            {% endif %}
+        </div>
+    </header>
+    <main class="app-content">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
