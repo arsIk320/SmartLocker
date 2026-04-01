@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QDesktopServices, QFont
 from PyQt6.QtWidgets import (
     QApplication,
@@ -189,7 +189,7 @@ class MainWidget(QWidget):
         self.tabs.addTab(self.wrap_scroll(self.objects_tab), "Объекты и двери")
         self.tabs.addTab(self.wrap_scroll(self.lock_test_tab), "Тест lock API")
 
-        self.refresh_all()
+        QTimer.singleShot(0, self.refresh_all)
 
     def wrap_scroll(self, widget: QWidget) -> QScrollArea:
         area = QScrollArea()
@@ -419,12 +419,41 @@ class MainWidget(QWidget):
         return page
 
     def refresh_all(self) -> None:
-        self.refresh_ports()
-        self.refresh_wifi_networks()
-        self.refresh_objects()
-        self.refresh_devices()
+        self._start_worker(
+            WorkerThread(self._load_initial_data_job),
+            busy_message="Загружаем данные SmartLocker...",
+            on_result=self._apply_initial_data,
+            on_error=lambda message: QMessageBox.critical(self, "SmartLocker Desktop", message),
+        )
+
+    def _load_initial_data_job(self) -> dict[str, object]:
+        ports = self.window.serial_service.list_ports()
+        wifi_networks = self.window.serial_service.list_wifi_networks()
+        if self.window.uses_remote_api:
+            house_views = self.window.api_client.list_objects()
+            devices = self.window.api_client.list_locks()
+        else:
+            with self.window.session_factory() as db:
+                property_service = PropertyService(db=db, encryption=self.window.encryption)
+                lock_service = LockDeviceService(db=db, encryption=self.window.encryption)
+                houses = property_service.list_houses(self.window.user.email)
+                house_views = [property_service.export_house_view(house) for house in houses]
+                devices = lock_service.list_devices(self.window.user.email)
+        return {
+            "ports": ports,
+            "wifi_networks": wifi_networks,
+            "house_views": house_views,
+            "devices": devices,
+        }
+
+    def _apply_initial_data(self, payload: dict[str, object]) -> None:
+        self._apply_ports(payload.get("ports", []))
+        self._apply_wifi_networks(payload.get("wifi_networks", []))
+        self._apply_house_views(payload.get("house_views", []))
+        self._apply_devices(payload.get("devices", []))
         self.fill_last_provisioning()
         self.reset_activation_progress()
+        self.window.show_status("Данные загружены.")
 
     def reset_activation_progress(self) -> None:
         self.activation_progress.setValue(0)
@@ -490,6 +519,9 @@ class MainWidget(QWidget):
 
     def refresh_ports(self) -> None:
         ports = self.window.serial_service.list_ports()
+        self._apply_ports(ports)
+
+    def _apply_ports(self, ports: list[SerialBoardInfo]) -> None:
         current = self.port_combo.currentText()
         self.port_combo.clear()
         if ports:
@@ -542,7 +574,9 @@ class MainWidget(QWidget):
                 service = PropertyService(db=db, encryption=self.window.encryption)
                 houses = service.list_houses(self.window.user.email)
                 house_views = [service.export_house_view(house) for house in houses]
+        self._apply_house_views(house_views)
 
+    def _apply_house_views(self, house_views: list[dict]) -> None:
         self.house_map = {f"{house['name']} ({house['address']})": str(house['id']) for house in house_views}
         self.door_map = {}
 
@@ -575,7 +609,9 @@ class MainWidget(QWidget):
             with self.window.session_factory() as db:
                 service = LockDeviceService(db=db, encryption=self.window.encryption)
                 devices = service.list_devices(self.window.user.email)
+        self._apply_devices(devices)
 
+    def _apply_devices(self, devices: list[dict]) -> None:
         self.devices_table.setRowCount(0)
         for device in devices:
             boards = []

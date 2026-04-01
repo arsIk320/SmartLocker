@@ -56,11 +56,29 @@ def create_session_factory(database_url: str) -> tuple[Engine, sessionmaker[Sess
 
 def init_db(engine: Engine, database_url: str | None = None) -> None:
     if database_url and ("neon.tech" in database_url or "pooler.supabase.com" in database_url):
+        if _has_existing_remote_schema(database_url):
+            return
         _bootstrap_neon_schema(database_url)
         return
 
     Base.metadata.create_all(bind=engine)
     _apply_compat_migrations(engine)
+
+
+def _has_existing_remote_schema(database_url: str) -> bool:
+    raw_url = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+    with psycopg.connect(raw_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                select table_name
+                from information_schema.tables
+                where table_schema = 'public'
+                  and table_name in ('auth_users', 'doors', 'access_grants')
+                limit 1
+                """
+            )
+            return cursor.fetchone() is not None
 
 
 def _bootstrap_neon_schema(database_url: str) -> None:
