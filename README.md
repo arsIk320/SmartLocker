@@ -75,7 +75,12 @@ python run_telegram_bot.py
 
 ## MAX bot
 
-MAX-бот запускается отдельно от сайта и использует тот же backend API, но через свои эндпоинты `/api/v1/max/...`.
+MAX-бот поддерживает два режима:
+
+- разработка: отдельный polling-процесс `python run_max_bot.py`
+- production: webhook внутри того же FastAPI-сервиса
+
+В production MAX рекомендует использовать только webhook.
 
 Нужны переменные:
 
@@ -83,14 +88,29 @@ MAX-бот запускается отдельно от сайта и испол
 MAX_BOT_TOKEN=...
 MAX_BOT_API_KEY=...
 MAX_BOT_API_BASE_URL=http://127.0.0.1:8000
+MAX_BOT_WEBHOOK_BASE_URL=
+MAX_BOT_WEBHOOK_SECRET=
 MAX_PLATFORM_API_BASE_URL=https://platform-api.max.ru
 MAX_BOT_POLL_TIMEOUT=30
 ```
 
-Запуск:
+Локальный запуск через polling:
 
 ```bash
 python run_max_bot.py
+```
+
+Production через тот же backend:
+
+```bash
+MAX_BOT_WEBHOOK_BASE_URL=https://your-api-name.onrender.com
+MAX_BOT_WEBHOOK_SECRET=...
+```
+
+Webhook будет зарегистрирован на:
+
+```text
+https://your-api-name.onrender.com/api/v1/max/webhook
 ```
 
 Сценарии:

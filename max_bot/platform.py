@@ -39,6 +39,38 @@ class MaxPlatformClient:
         response.raise_for_status()
         return response.json()
 
+    async def subscribe_webhook(
+        self,
+        *,
+        url: str,
+        update_types: list[str],
+        secret: str | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "url": url,
+            "update_types": update_types,
+        }
+        if secret:
+            body["secret"] = secret
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+            response = await client.post(
+                f"{self._base_url}/subscriptions",
+                headers={**self._headers, "Content-Type": "application/json"},
+                json=body,
+            )
+        response.raise_for_status()
+        return response.json()
+
+    async def delete_webhook(self, *, url: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+            response = await client.delete(
+                f"{self._base_url}/subscriptions",
+                headers=self._headers,
+                params={"url": url},
+            )
+        response.raise_for_status()
+        return response.json()
+
     async def send_message(
         self,
         *,

@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     max_bot_token: str | None = None
     max_bot_api_key: str | None = None
     max_bot_api_base_url: str = "http://127.0.0.1:8000"
+    max_bot_api_internal_host: str | None = None
+    max_bot_api_internal_port: int | None = None
+    max_bot_webhook_base_url: str | None = None
+    max_bot_webhook_secret: str | None = None
     max_platform_api_base_url: str = "https://platform-api.max.ru"
     max_bot_poll_timeout: int = 30
 
@@ -89,6 +93,9 @@ class Settings(BaseSettings):
         "telegram_proxy_url",
         "max_bot_token",
         "max_bot_api_key",
+        "max_bot_api_internal_host",
+        "max_bot_webhook_base_url",
+        "max_bot_webhook_secret",
         mode="before",
     )
     @classmethod
@@ -100,6 +107,13 @@ class Settings(BaseSettings):
     @field_validator("telegram_bot_api_internal_port", mode="before")
     @classmethod
     def blank_port_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("max_bot_api_internal_port", mode="before")
+    @classmethod
+    def blank_max_port_to_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
         return value

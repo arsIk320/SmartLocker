@@ -53,6 +53,10 @@ def apply_local_defaults() -> None:
         "MAX_BOT_API_BASE_URL": "http://127.0.0.1:8000",
         "MAX_PLATFORM_API_BASE_URL": "https://platform-api.max.ru",
         "MAX_BOT_POLL_TIMEOUT": "30",
+        "MAX_BOT_API_INTERNAL_HOST": "",
+        "MAX_BOT_API_INTERNAL_PORT": "",
+        "MAX_BOT_WEBHOOK_BASE_URL": "",
+        "MAX_BOT_WEBHOOK_SECRET": "",
     }
     for key, value in defaults.items():
         os.environ.setdefault(key, value)
@@ -215,6 +219,15 @@ def run_setup_wizard() -> None:
             "MAX_BOT_POLL_TIMEOUT",
             os.getenv("MAX_BOT_POLL_TIMEOUT", "30"),
         )
+        values["MAX_BOT_WEBHOOK_BASE_URL"] = prompt_value(
+            "MAX_BOT_WEBHOOK_BASE_URL",
+            os.getenv("MAX_BOT_WEBHOOK_BASE_URL", ""),
+        )
+        values["MAX_BOT_WEBHOOK_SECRET"] = prompt_value(
+            "MAX_BOT_WEBHOOK_SECRET",
+            os.getenv("MAX_BOT_WEBHOOK_SECRET", ""),
+            secret=True,
+        )
 
     if values:
         save_local_env(values)
@@ -253,6 +266,8 @@ def print_startup_info() -> None:
             f"- MAX platform API base: "
             f"{os.environ.get('MAX_PLATFORM_API_BASE_URL', 'https://platform-api.max.ru')}"
         )
+        if os.getenv("MAX_BOT_WEBHOOK_BASE_URL"):
+            print(f"- MAX webhook base: {os.environ['MAX_BOT_WEBHOOK_BASE_URL']}")
 
 
 def main() -> None:

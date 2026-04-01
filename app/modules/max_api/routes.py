@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -9,6 +12,7 @@ from app.modules.max_api.service import MaxGuestService
 from app.services.encryption import EncryptionService
 
 router = APIRouter(prefix="/max", tags=["max"])
+logger = logging.getLogger(__name__)
 
 
 def get_encryption_service(request: Request) -> EncryptionService:
@@ -45,6 +49,37 @@ def require_bot_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid bot API key.",
         )
+
+
+async def _dispatch_update(runtime, update: dict) -> None:
+    try:
+        await runtime.application.handle_update(update)
+    except Exception:
+        logger.exception("MAX webhook update processing failed")
+
+
+@router.post("/webhook")
+async def max_webhook(
+    request: Request,
+    x_max_bot_api_secret: str | None = Header(default=None, alias="X-Max-Bot-Api-Secret"),
+):
+    runtime = getattr(request.app.state, "max_bot_runtime", None)
+    if runtime is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MAX webhook runtime is not configured.",
+        )
+
+    expected_secret = request.app.state.settings.max_bot_webhook_secret
+    if expected_secret and x_max_bot_api_secret != expected_secret:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid MAX webhook secret.",
+        )
+
+    payload = await request.json()
+    asyncio.create_task(_dispatch_update(runtime, payload))
+    return {"ok": True}
 
 
 @router.post("/guest/bookings")

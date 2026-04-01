@@ -46,6 +46,14 @@ class IncomingMessage:
     attachments: list[dict[str, Any]]
 
 
+@dataclass
+class MaxBotRuntime:
+    settings: Any
+    api_client: SmartLockerMaxApiClient
+    platform_client: MaxPlatformClient
+    application: "MaxBotApplication"
+
+
 def help_text() -> str:
     return (
         "Как пользоваться ботом:\n"
@@ -594,43 +602,66 @@ class MaxBotApplication:
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    await run_polling()
 
-    settings = load_max_bot_settings()
+
+async def create_runtime(settings=None) -> MaxBotRuntime:
+    resolved_settings = settings or load_max_bot_settings()
     api_client = SmartLockerMaxApiClient(
-        api_base_url=settings.api_base_url,
-        api_key=settings.api_key,
+        api_base_url=resolved_settings.api_base_url,
+        api_key=resolved_settings.api_key,
     )
     platform_client = MaxPlatformClient(
-        token=settings.token,
-        base_url=settings.platform_api_base_url,
+        token=resolved_settings.token,
+        base_url=resolved_settings.platform_api_base_url,
     )
-    app = MaxBotApplication(
+    application = MaxBotApplication(
         api_client=api_client,
         platform_client=platform_client,
     )
+    return MaxBotRuntime(
+        settings=resolved_settings,
+        api_client=api_client,
+        platform_client=platform_client,
+        application=application,
+    )
 
+
+async def shutdown_runtime(runtime: MaxBotRuntime) -> None:
+    _ = runtime
+
+
+async def process_update(runtime: MaxBotRuntime, update: dict[str, Any]) -> None:
+    await runtime.application.handle_update(update)
+
+
+async def run_polling(settings=None) -> None:
+    runtime = await create_runtime(settings)
     marker: int | None = None
-    while True:
-        try:
-            payload = await platform_client.get_updates(
-                marker=marker,
-                timeout=settings.poll_timeout,
-            )
-            updates = payload.get("updates") or []
-            next_marker = payload.get("marker")
-            for update in updates:
-                try:
-                    await app.handle_update(update)
-                except Exception:
-                    logger.exception("Failed to handle MAX update")
-            if next_marker is not None:
-                marker = int(next_marker)
-        except httpx.HTTPError:
-            logger.exception("MAX polling request failed")
-            await asyncio.sleep(5)
-        except Exception:
-            logger.exception("Unexpected MAX bot error")
-            await asyncio.sleep(5)
+    try:
+        while True:
+            try:
+                payload = await runtime.platform_client.get_updates(
+                    marker=marker,
+                    timeout=runtime.settings.poll_timeout,
+                )
+                updates = payload.get("updates") or []
+                next_marker = payload.get("marker")
+                for update in updates:
+                    try:
+                        await process_update(runtime, update)
+                    except Exception:
+                        logger.exception("Failed to handle MAX update")
+                if next_marker is not None:
+                    marker = int(next_marker)
+            except httpx.HTTPError:
+                logger.exception("MAX polling request failed")
+                await asyncio.sleep(5)
+            except Exception:
+                logger.exception("Unexpected MAX bot error")
+                await asyncio.sleep(5)
+    finally:
+        await shutdown_runtime(runtime)
 
 
 if __name__ == "__main__":
