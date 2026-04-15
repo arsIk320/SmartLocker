@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import secrets
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import DoorModel, LockDeviceModel
@@ -17,6 +18,7 @@ class LockDeviceService:
         self,
         owner_email: str,
         *,
+        device_id: str | None = None,
         lock_id: str,
         device_name: str,
         wifi_ssid: str,
@@ -35,13 +37,44 @@ class LockDeviceService:
         uid_hash = self._hash_uid(normalized_device_uid)
         generated_api_key: str | None = None
 
-        device = (
+        device_by_id = (
+            self._db.query(LockDeviceModel)
+            .filter(LockDeviceModel.id == device_id)
+            .one_or_none()
+            if device_id
+            else None
+        )
+        device_by_lock_id = (
             self._db.query(LockDeviceModel)
             .filter(LockDeviceModel.lock_id_hash == lock_id_hash)
             .one_or_none()
         )
-        if device is not None and device.owner_email != owner_key:
+        device_by_uid = (
+            self._db.query(LockDeviceModel)
+            .filter(LockDeviceModel.device_uid_hash == uid_hash)
+            .one_or_none()
+        )
+        if device_by_id is not None and device_by_id.owner_email != owner_key:
+            raise ValueError("Selected lock belongs to another account.")
+        if device_by_lock_id is not None and device_by_lock_id.owner_email != owner_key:
             raise ValueError("Этот замок уже привязан к другому аккаунту.")
+
+        if device_by_uid is not None and device_by_uid.owner_email != owner_key:
+            raise ValueError("This board UID is already linked to another account.")
+        if device_by_id is not None:
+            if device_by_lock_id is not None and device_by_lock_id.id != device_by_id.id:
+                raise ValueError("This Lock ID is already used by another saved lock.")
+            if device_by_uid is not None and device_by_uid.id != device_by_id.id:
+                raise ValueError("This board UID is already used by another saved lock.")
+            device = device_by_id
+        else:
+            if (
+                device_by_lock_id is not None
+                and device_by_uid is not None
+                and device_by_lock_id.id != device_by_uid.id
+            ):
+                raise ValueError("Lock ID and board UID point to different saved locks.")
+            device = device_by_lock_id or device_by_uid
 
         door = self._get_door(owner_key, door_id) if door_id else None
 
@@ -83,7 +116,11 @@ class LockDeviceService:
                 device.api_key_hash = self._hash_uid(generated_api_key)
                 device.api_key_encrypted = self._encryption.encrypt(generated_api_key)
 
-        self._db.commit()
+        try:
+            self._db.commit()
+        except IntegrityError as exc:
+            self._db.rollback()
+            raise ValueError("Unable to save lock because Lock ID or board UID is already in use.") from exc
         self._db.refresh(device)
         if generated_api_key is not None:
             setattr(device, "_plain_api_key", generated_api_key)
@@ -100,6 +137,18 @@ class LockDeviceService:
         )
         return [self.export_view(device) for device in devices]
 
+    def delete_device(self, owner_email: str, *, device_id: str) -> None:
+        owner_key = owner_email.strip().lower()
+        device = (
+            self._db.query(LockDeviceModel)
+            .filter(LockDeviceModel.id == device_id, LockDeviceModel.owner_email == owner_key)
+            .one_or_none()
+        )
+        if device is None:
+            raise ValueError("Saved lock not found.")
+        self._db.delete(device)
+        self._db.commit()
+
     def export_view(self, device: LockDeviceModel) -> dict[str, str]:
         door_name = ""
         door_uid = ""
@@ -111,6 +160,7 @@ class LockDeviceService:
                 house_name = device.door.house.name
         return {
             "id": device.id,
+            "door_id": device.door_id or "",
             "lock_id": self._encryption.decrypt(device.lock_id_encrypted),
             "has_api_key": bool(device.api_key_hash),
             "device_uid": self._encryption.decrypt(device.device_uid_encrypted),

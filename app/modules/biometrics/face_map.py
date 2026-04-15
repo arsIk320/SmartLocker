@@ -125,7 +125,18 @@ def estimate_quality(image: np.ndarray, bbox: tuple[int, int, int, int]) -> floa
 
 
 def build_face_map_from_path(image_path: Path, min_quality: float = MIN_QUALITY_SCORE) -> dict[str, Any]:
-    return _build_face_map(
+    return _build_single_face_map(
+        load_image_from_path(image_path),
+        source_image=str(image_path.resolve()),
+        min_quality=min_quality,
+    )
+
+
+def build_face_maps_from_path(
+    image_path: Path,
+    min_quality: float = MIN_QUALITY_SCORE,
+) -> list[dict[str, Any]]:
+    return _build_face_map_collection(
         load_image_from_path(image_path),
         source_image=str(image_path.resolve()),
         min_quality=min_quality,
@@ -133,17 +144,75 @@ def build_face_map_from_path(image_path: Path, min_quality: float = MIN_QUALITY_
 
 
 def build_face_map_from_bytes(payload: bytes, *, min_quality: float = MIN_QUALITY_SCORE) -> dict[str, Any]:
-    return _build_face_map(
+    return _build_single_face_map(
         load_image_from_bytes(payload),
         source_image="telegram-upload",
         min_quality=min_quality,
     )
 
 
-def _build_face_map(image: np.ndarray, *, source_image: str, min_quality: float) -> dict[str, Any]:
+def build_face_maps_from_bytes(
+    payload: bytes,
+    *,
+    min_quality: float = MIN_QUALITY_SCORE,
+) -> list[dict[str, Any]]:
+    return _build_face_map_collection(
+        load_image_from_bytes(payload),
+        source_image="telegram-upload",
+        min_quality=min_quality,
+    )
+
+
+def _build_single_face_map(image: np.ndarray, *, source_image: str, min_quality: float) -> dict[str, Any]:
+    _, image_bgr, faces, recognizer = _detect_faces(image)
+    if len(faces) > 1:
+        raise FaceMapError("Multiple faces found in the image.")
+    return _build_face_map_from_detection(
+        image=image,
+        image_bgr=image_bgr,
+        face=faces[0],
+        recognizer=recognizer,
+        source_image=source_image,
+        min_quality=min_quality,
+    )
+
+
+def _build_face_map_collection(
+    image: np.ndarray,
+    *,
+    source_image: str,
+    min_quality: float,
+) -> list[dict[str, Any]]:
+    _, image_bgr, faces, recognizer = _detect_faces(image)
+    collected: list[dict[str, Any]] = []
+    last_error: FaceMapError | None = None
+    for face in faces:
+        try:
+            collected.append(
+                _build_face_map_from_detection(
+                    image=image,
+                    image_bgr=image_bgr,
+                    face=face,
+                    recognizer=recognizer,
+                    source_image=source_image,
+                    min_quality=min_quality,
+                )
+            )
+        except FaceMapError as exc:
+            last_error = exc
+
+    if collected:
+        return collected
+    if last_error is not None:
+        raise last_error
+    raise FaceMapError("No usable faces found in the image.")
+
+
+def _detect_faces(image: np.ndarray):
     cv2 = _load_cv2()
     _ensure_models()
 
+    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     height, width = image.shape[:2]
     detector = cv2.FaceDetectorYN.create(
         str(YUNET_MODEL_PATH),
@@ -154,14 +223,25 @@ def _build_face_map(image: np.ndarray, *, source_image: str, min_quality: float)
         top_k=5000,
     )
     detector.setInputSize((width, height))
-    _, faces = detector.detect(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+    _, faces = detector.detect(image_bgr)
 
     if faces is None or len(faces) == 0:
         raise FaceMapError("No face found in the image.")
-    if len(faces) > 1:
-        raise FaceMapError("Multiple faces found in the image.")
 
-    face = faces[0]
+    recognizer = cv2.FaceRecognizerSF.create(str(SFACE_MODEL_PATH), "")
+    sorted_faces = sorted(faces, key=lambda item: (float(item[0]), float(item[1])))
+    return cv2, image_bgr, sorted_faces, recognizer
+
+
+def _build_face_map_from_detection(
+    *,
+    image: np.ndarray,
+    image_bgr: np.ndarray,
+    face: np.ndarray,
+    recognizer,
+    source_image: str,
+    min_quality: float,
+) -> dict[str, Any]:
     bbox = _extract_bbox(face)
     quality_score = estimate_quality(image, bbox)
     if quality_score < min_quality:
@@ -169,8 +249,7 @@ def _build_face_map(image: np.ndarray, *, source_image: str, min_quality: float)
             f"Low quality image. quality_score={quality_score}, required>={min_quality}"
         )
 
-    recognizer = cv2.FaceRecognizerSF.create(str(SFACE_MODEL_PATH), "")
-    aligned_face = recognizer.alignCrop(cv2.cvtColor(image, cv2.COLOR_RGB2BGR), face)
+    aligned_face = recognizer.alignCrop(image_bgr, face)
     embedding = recognizer.feature(aligned_face)
     if embedding is None or embedding.size == 0:
         raise FaceMapError("Unable to extract face embedding.")

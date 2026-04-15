@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     travelline_client_secret: str | None = None
     travelline_property_id: str | None = None
     travelline_timeout_seconds: int = 20
+    travelline_auto_sync_enabled: bool = True
+    travelline_auto_sync_interval_seconds: int = 15
+    travelline_auto_sync_limit_per_page: int = 100
+    travelline_auto_sync_max_pages: int = 20
 
     session_cookie_name: str = "smartlocker_session"
     session_persist_days: int = 30

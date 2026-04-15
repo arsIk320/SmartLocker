@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SmartLockerDesktop")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+de5a200a6cc9af8935768c4265e09e7dd06626fe")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+718a22c30cbb5799cd0fbc48b0bb843e4a9469d9")]
 [assembly: System.Reflection.AssemblyProductAttribute("SmartLockerDesktop")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SmartLockerDesktop")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

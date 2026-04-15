@@ -9,6 +9,14 @@
     <a class="btn primary" href="/objects">Управлять объектами</a>
 </section>
 
+{% if request.query_params.get("success") %}
+<div class="alert success">{{ request.query_params.get("success") }}</div>
+{% endif %}
+
+{% if request.query_params.get("error") %}
+<div class="alert error">{{ request.query_params.get("error") }}</div>
+{% endif %}
+
 <section class="grid grid-4">
     <article class="panel stat">
         <span class="stat-label">Домов</span>
@@ -193,4 +201,14 @@
         {% endfor %}
     </div>
 </section>
+{% if travelline_connection %}
+<script>
+const travelLineSecretInput = document.querySelector('input[name="client_secret"]');
+if (travelLineSecretInput) {
+    travelLineSecretInput.required = false;
+    travelLineSecretInput.placeholder = "Оставьте пустым, чтобы сохранить текущий secret";
+}
+setTimeout(() => window.location.reload(), 15000);
+</script>
+{% endif %}
 {% endblock %}

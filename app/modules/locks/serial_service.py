@@ -28,6 +28,8 @@ class SerialProvisioningService:
     PROTOCOL_NAME = "smartlocker-provisioning-v1"
     READ_POLL_TIMEOUT = 0.25
     PREPARE_DELAY_SECONDS = 0.35
+    SUPPORTED_CHIPS = {"ESP8266", "ESP32", "ESP32-CAM"}
+    ESP32_FAMILY = {"ESP32", "ESP32-CAM"}
 
     def list_ports(self) -> list[SerialBoardInfo]:
         ports = []
@@ -81,7 +83,7 @@ class SerialProvisioningService:
             )
 
         chip = str(response.get("chip", "")).strip().upper()
-        if chip not in {"ESP8266", "ESP32"}:
+        if chip not in self.SUPPORTED_CHIPS:
             raise ValueError("Подключенная плата не ответила корректным типом chip.")
 
         return SerialBoardInfo(
@@ -112,7 +114,7 @@ class SerialProvisioningService:
         timeout: float = 5.0,
     ) -> dict[str, object]:
         normalized_chip = chip.strip().upper()
-        if normalized_chip not in {"ESP8266", "ESP32"}:
+        if normalized_chip not in self.SUPPORTED_CHIPS:
             raise ValueError("Для записи конфигурации нужен chip ESP8266 или ESP32.")
 
         payload = {
@@ -142,7 +144,13 @@ class SerialProvisioningService:
 
     @staticmethod
     def generate_board_uid(chip: str) -> str:
-        prefix = "ESP32" if chip.strip().upper() == "ESP32" else "ESP8266"
+        normalized_chip = chip.strip().upper()
+        if normalized_chip == "ESP32-CAM":
+            prefix = "ESP32CAM"
+        elif normalized_chip in SerialProvisioningService.ESP32_FAMILY:
+            prefix = "ESP32"
+        else:
+            prefix = "ESP8266"
         return f"{prefix}-{secrets.token_hex(4).upper()}"
 
     def _lookup_port(self, port_name: str) -> SerialBoardInfo:

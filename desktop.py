@@ -159,7 +159,9 @@ class MainWidget(QWidget):
         self.window = window
         self.house_map: dict[str, str] = {}
         self.door_map: dict[str, dict[str, str]] = {}
+        self.devices_map: dict[int, dict] = {}
         self.detected_board: SerialBoardInfo | None = None
+        self.selected_device_id: str | None = None
         self.active_worker: WorkerThread | None = None
 
         root = QVBoxLayout(self)
@@ -246,6 +248,9 @@ class MainWidget(QWidget):
         activate.clicked.connect(self.activate_lock_async)
         activate.setMinimumHeight(44)
         self.activate_button = activate
+        clear_overwrite = QPushButton("New Record")
+        clear_overwrite.clicked.connect(self.clear_overwrite_target)
+        self.clear_overwrite_button = clear_overwrite
 
         actions.addWidget(QLabel("COM-порт"), 0, 0)
         actions.addWidget(self.port_combo, 1, 0)
@@ -280,7 +285,10 @@ class MainWidget(QWidget):
         self.activation_log.setReadOnly(True)
         self.activation_log.setMinimumHeight(180)
         left_layout.addWidget(self.activation_log)
-        left_layout.addWidget(activate)
+        activation_buttons = QHBoxLayout()
+        activation_buttons.addWidget(activate, 1)
+        activation_buttons.addWidget(clear_overwrite)
+        left_layout.addLayout(activation_buttons)
         left_layout.addStretch(1)
 
         right_layout = QVBoxLayout(right)
@@ -312,7 +320,23 @@ class MainWidget(QWidget):
         self.devices_table.horizontalHeader().setStretchLastSection(True)
         self.devices_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.devices_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.devices_table.itemDoubleClicked.connect(lambda _: self.load_selected_device_into_form())
         card_layout.addWidget(self.devices_table)
+        actions = QHBoxLayout()
+        load_button = QPushButton("Load For Overwrite")
+        load_button.clicked.connect(self.load_selected_device_into_form)
+        self.load_device_button = load_button
+        delete_button = QPushButton("Delete Selected")
+        delete_button.clicked.connect(self.delete_selected_device_async)
+        self.delete_device_button = delete_button
+        refresh_button = QPushButton("Refresh List")
+        refresh_button.clicked.connect(self.refresh_devices)
+        self.refresh_devices_button = refresh_button
+        actions.addWidget(load_button)
+        actions.addWidget(delete_button)
+        actions.addStretch(1)
+        actions.addWidget(refresh_button)
+        card_layout.addLayout(actions)
         layout.addWidget(card)
         return page
 
@@ -481,6 +505,10 @@ class MainWidget(QWidget):
             getattr(self, "generate_ids_button", None),
             getattr(self, "refresh_wifi_button", None),
             getattr(self, "activate_button", None),
+            getattr(self, "clear_overwrite_button", None),
+            getattr(self, "load_device_button", None),
+            getattr(self, "delete_device_button", None),
+            getattr(self, "refresh_devices_button", None),
             getattr(self, "port_combo", None),
             getattr(self, "wifi_combo", None),
             getattr(self, "door_combo", None),
@@ -612,6 +640,7 @@ class MainWidget(QWidget):
         self._apply_devices(devices)
 
     def _apply_devices(self, devices: list[dict]) -> None:
+        self.devices_map = {}
         self.devices_table.setRowCount(0)
         for device in devices:
             boards = []
@@ -633,8 +662,79 @@ class MainWidget(QWidget):
             ]
             row = self.devices_table.rowCount()
             self.devices_table.insertRow(row)
+            self.devices_map[row] = device
             for col, value in enumerate(values):
                 self.devices_table.setItem(row, col, QTableWidgetItem(str(value)))
+
+    def _selected_device(self) -> dict | None:
+        row = self.devices_table.currentRow()
+        if row < 0:
+            return None
+        return self.devices_map.get(row)
+
+    def clear_overwrite_target(self) -> None:
+        self.selected_device_id = None
+        self.activate_button.setText("Activate Lock")
+        self.window.show_status("Overwrite mode cleared.")
+
+    def load_selected_device_into_form(self) -> None:
+        device = self._selected_device()
+        if device is None:
+            QMessageBox.information(self, "Locks", "Select a lock in the list first.")
+            return
+        self.selected_device_id = str(device.get("id", "")).strip() or None
+        self.lock_id_edit.setText(str(device.get("lock_id", "")))
+        self.esp8266_uid_edit.setText(str(device.get("esp8266_uid", "")))
+        self.esp32_uid_edit.setText(str(device.get("esp32_uid", "")))
+        self.device_name_edit.setText(str(device.get("device_name", "")))
+        self.wifi_combo.setCurrentText(str(device.get("wifi_ssid", "")))
+        self.wifi_password_edit.clear()
+        target_door_id = str(device.get("door_id", "") or "")
+        if target_door_id:
+            for index, item in enumerate(self.door_map.items()):
+                if item[1].get("id") == target_door_id:
+                    self.door_combo.setCurrentIndex(index + 1)
+                    break
+        else:
+            self.door_combo.setCurrentIndex(0)
+        self.activate_button.setText("Overwrite Selected Lock")
+        self.tabs.setCurrentIndex(0)
+        self.window.show_status("Lock loaded into the form. Enter Wi-Fi password and start overwrite.")
+
+    def delete_selected_device_async(self) -> None:
+        device = self._selected_device()
+        if device is None:
+            QMessageBox.information(self, "Locks", "Select a lock in the list first.")
+            return
+        lock_id = str(device.get("lock_id", ""))
+        answer = QMessageBox.question(
+            self,
+            "Delete Lock",
+            f"Delete lock {lock_id} from the list?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        def job() -> dict:
+            device_id = str(device.get("id", ""))
+            if self.window.uses_remote_api:
+                return self.window.api_client.delete_lock(device_id)
+            with self.window.session_factory() as db:
+                service = LockDeviceService(db=db, encryption=self.window.encryption)
+                service.delete_device(self.window.user.email, device_id=device_id)
+            return {"ok": True}
+
+        def on_result(_: dict) -> None:
+            if self.selected_device_id == str(device.get("id", "")):
+                self.clear_overwrite_target()
+            self.refresh_devices()
+            self.window.show_status(f"Lock {lock_id} deleted.")
+
+        self._start_worker(
+            WorkerThread(job),
+            busy_message="Deleting lock...",
+            on_result=on_result,
+        )
 
     def fill_last_provisioning(self) -> None:
         provisioning = self.window.last_provisioning
@@ -714,6 +814,12 @@ class MainWidget(QWidget):
             self.board_info_label.setText(f"{board.chip} на {board.port}, firmware: {firmware}")
             self.update_activation_progress({"percent": 100, "message": f"Плата определена: {board.chip}, firmware {firmware}."})
             self.window.show_status(f"Обнаружена плата {board.chip} на {board.port}.")
+            detected_board_uid = (board.board_uid or "").strip()
+            if detected_board_uid and not detected_board_uid.endswith("-TEMP"):
+                if board.chip == "ESP8266" and not self.esp8266_uid_edit.text().strip():
+                    self.esp8266_uid_edit.setText(detected_board_uid)
+                if board.chip in {"ESP32", "ESP32-CAM"} and not self.esp32_uid_edit.text().strip():
+                    self.esp32_uid_edit.setText(detected_board_uid)
             self.generate_ids(for_detected_only=True)
 
         def on_error(message: str) -> None:
@@ -742,8 +848,8 @@ class MainWidget(QWidget):
         if for_detected_only and self.detected_board:
             if self.detected_board.chip == "ESP8266" and not self.esp8266_uid_edit.text().strip():
                 self.esp8266_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP8266"))
-            if self.detected_board.chip == "ESP32" and not self.esp32_uid_edit.text().strip():
-                self.esp32_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP32"))
+            if self.detected_board.chip in {"ESP32", "ESP32-CAM"} and not self.esp32_uid_edit.text().strip():
+                self.esp32_uid_edit.setText(self.window.serial_service.generate_board_uid(self.detected_board.chip))
             return
         if not self.esp8266_uid_edit.text().strip():
             self.esp8266_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP8266"))
@@ -809,7 +915,11 @@ class MainWidget(QWidget):
             progress_callback({"percent": 5, "message": "Проверяем данные активации..."})
         self.generate_ids(for_detected_only=True)
         chip = self.detected_board.chip or ""
-        board_uid = self.esp32_uid_edit.text().strip() if chip == "ESP32" else self.esp8266_uid_edit.text().strip()
+        board_uid = (
+            self.esp32_uid_edit.text().strip()
+            if chip in {"ESP32", "ESP32-CAM"}
+            else self.esp8266_uid_edit.text().strip()
+        )
         wifi_ssid = self.wifi_combo.currentText().strip()
 
         if not self.lock_id_edit.text().strip():
@@ -829,6 +939,7 @@ class MainWidget(QWidget):
             if progress_callback is not None:
                 progress_callback({"percent": 30, "message": "Сохраняем замок через API..."})
             save_result = self.window.api_client.save_lock(
+                device_id=self.selected_device_id,
                 lock_id=self.lock_id_edit.text(),
                 device_name=self.device_name_edit.text() or self.lock_id_edit.text(),
                 wifi_ssid=wifi_ssid,
@@ -846,6 +957,7 @@ class MainWidget(QWidget):
                 service = LockDeviceService(db=db, encryption=self.window.encryption)
                 device = service.save_device(
                     self.window.user.email,
+                    device_id=self.selected_device_id,
                     lock_id=self.lock_id_edit.text(),
                     device_name=self.device_name_edit.text() or self.lock_id_edit.text(),
                     wifi_ssid=wifi_ssid,
@@ -892,6 +1004,7 @@ class MainWidget(QWidget):
             self.window.last_provisioning = (
                 result["provisioning"] if isinstance(result.get("provisioning"), dict) else None
             )
+            self.clear_overwrite_target()
             self.refresh_devices()
             self.fill_last_provisioning()
             self.window.show_status(

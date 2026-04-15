@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import AccessGrantModel, DoorModel, FacePhotoSubmissionModel
-from app.modules.biometrics.face_map import FaceMapError, build_face_map_from_bytes
+from app.modules.biometrics.face_map import FaceMapError, build_face_maps_from_bytes
 from app.modules.locks.qr_service import QrAccessService
 from app.services.encryption import EncryptionService
 
@@ -28,6 +28,7 @@ class GuestAccessLookup:
     face_profile_status: str
     face_profile_quality_score: float | None
     face_profile_error: str | None
+    face_profile_faces_count: int
 
 
 class MessengerGuestService:
@@ -220,12 +221,17 @@ class MessengerGuestService:
         )
 
         try:
-            face_map = build_face_map_from_bytes(photo_bytes)
+            face_maps = build_face_maps_from_bytes(photo_bytes)
             submission.face_map_encrypted = self._encryption.encrypt(
-                json.dumps(face_map, ensure_ascii=False)
+                json.dumps(face_maps, ensure_ascii=False)
             )
-            submission.face_quality_score = float(face_map["quality_score"])
-            submission.face_model_version = str(face_map["model_version"])
+            quality_values = [
+                float(face_map["quality_score"])
+                for face_map in face_maps
+                if face_map.get("quality_score") is not None
+            ]
+            submission.face_quality_score = max(quality_values) if quality_values else None
+            submission.face_model_version = str(face_maps[0]["model_version"]) if face_maps else None
             submission.processing_error = None
             submission.processed_at = datetime.now(UTC)
             submission.status = "processed"
@@ -246,6 +252,7 @@ class MessengerGuestService:
             "face_profile_status": self._normalize_face_profile_status(submission.status),
             "quality_score": submission.face_quality_score,
             "processing_error": submission.processing_error or "",
+            "faces_count": len(self._decode_face_maps(submission)),
         }
 
     def serialize_lookup(self, item: GuestAccessLookup) -> dict[str, object]:
@@ -270,14 +277,7 @@ class MessengerGuestService:
         guest_name: str,
     ) -> GuestAccessLookup:
         qr_payload = self._qr_service.get_current_qr_payload(grant.door)
-        submission = self._latest_face_submission(reservation_id=grant.reservation_external_id)
-        face_profile_status = "missing"
-        face_profile_quality_score = None
-        face_profile_error = None
-        if submission is not None:
-            face_profile_status = self._normalize_face_profile_status(submission.status)
-            face_profile_quality_score = submission.face_quality_score
-            face_profile_error = submission.processing_error
+        profile = self._face_profile_snapshot(reservation_id=grant.reservation_external_id)
         return GuestAccessLookup(
             reservation_external_id=grant.reservation_external_id,
             guest_name=guest_name,
@@ -288,9 +288,10 @@ class MessengerGuestService:
             valid_from=self._normalize_datetime(grant.valid_from),
             valid_to=self._normalize_datetime(grant.valid_to),
             qr_payload=qr_payload,
-            face_profile_status=face_profile_status,
-            face_profile_quality_score=face_profile_quality_score,
-            face_profile_error=face_profile_error,
+            face_profile_status=profile["status"],
+            face_profile_quality_score=profile["quality_score"],
+            face_profile_error=profile["error"],
+            face_profile_faces_count=profile["faces_count"],
         )
 
     def _latest_face_submission(self, *, reservation_id: str) -> FacePhotoSubmissionModel | None:
@@ -300,6 +301,70 @@ class MessengerGuestService:
             .order_by(FacePhotoSubmissionModel.created_at.desc())
             .first()
         )
+
+    def _face_profile_snapshot(self, *, reservation_id: str) -> dict[str, Any]:
+        submissions = (
+            self._db.query(FacePhotoSubmissionModel)
+            .filter(FacePhotoSubmissionModel.reservation_external_id == reservation_id)
+            .order_by(FacePhotoSubmissionModel.created_at.desc())
+            .all()
+        )
+        if not submissions:
+            return {
+                "status": "missing",
+                "quality_score": None,
+                "error": None,
+                "faces_count": 0,
+            }
+
+        latest_submission = submissions[0]
+        processed_face_maps: list[dict[str, Any]] = []
+        for submission in submissions:
+            if submission.status != "processed":
+                continue
+            processed_face_maps.extend(self._decode_face_maps(submission))
+
+        if processed_face_maps:
+            quality_values = [
+                self._safe_float(face_map.get("quality_score"))
+                for face_map in processed_face_maps
+                if self._safe_float(face_map.get("quality_score")) is not None
+            ]
+            return {
+                "status": "processed",
+                "quality_score": max(quality_values) if quality_values else latest_submission.face_quality_score,
+                "error": None,
+                "faces_count": len(processed_face_maps),
+            }
+
+        return {
+            "status": self._normalize_face_profile_status(latest_submission.status),
+            "quality_score": latest_submission.face_quality_score,
+            "error": latest_submission.processing_error,
+            "faces_count": 0,
+        }
+
+    def _decode_face_maps(self, submission: FacePhotoSubmissionModel) -> list[dict[str, Any]]:
+        if not submission.face_map_encrypted:
+            return []
+        try:
+            payload = json.loads(self._encryption.decrypt(submission.face_map_encrypted))
+        except Exception:
+            return []
+
+        if isinstance(payload, dict):
+            candidates = [payload]
+        elif isinstance(payload, list):
+            candidates = [item for item in payload if isinstance(item, dict)]
+        else:
+            candidates = []
+
+        decoded: list[dict[str, Any]] = []
+        for candidate in candidates:
+            embedding = candidate.get("embedding")
+            if isinstance(embedding, list) and embedding:
+                decoded.append(candidate)
+        return decoded
 
     @staticmethod
     def _normalize_face_profile_status(status: str | None) -> str:
@@ -346,3 +411,12 @@ class MessengerGuestService:
         if value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
+
+    @staticmethod
+    def _safe_float(value: object) -> float | None:
+        try:
+            if value is None:
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None

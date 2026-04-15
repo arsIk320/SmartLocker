@@ -85,7 +85,7 @@ public sealed class SerialProvisioningService
         var response = WithConnection(portName, baudRate, effectiveTimeout, connection => Request(connection, payload, effectiveTimeout, 4));
 
         var chip = ReadString(response, "chip").ToUpperInvariant();
-        if (chip is not ("ESP8266" or "ESP32"))
+        if (!IsSupportedChip(chip))
         {
             throw new InvalidOperationException("Плата не ответила корректным типом chip.");
         }
@@ -160,8 +160,35 @@ public sealed class SerialProvisioningService
 
     public string GenerateBoardUid(string chip)
     {
-        var prefix = string.Equals(chip, "ESP32", StringComparison.OrdinalIgnoreCase) ? "ESP32" : "ESP8266";
+        var prefix = chip.Trim().ToUpperInvariant() switch
+        {
+            "ESP32-CAM" => "ESP32CAM",
+            "ESP32" => "ESP32",
+            _ => "ESP8266",
+        };
         return $"{prefix}-{RandomNumberGenerator.GetHexString(4)}";
+    }
+
+    private static bool IsSupportedChip(string chip)
+    {
+        return chip is "ESP8266" or "ESP32" or "ESP32-CAM";
+    }
+
+    private static bool IsEsp32Family(string chip)
+    {
+        return chip is "ESP32" or "ESP32-CAM";
+    }
+
+    private static bool ChipsMatch(string expectedChip, string actualChip)
+    {
+        var normalizedExpected = expectedChip.Trim().ToUpperInvariant();
+        var normalizedActual = actualChip.Trim().ToUpperInvariant();
+        if (normalizedExpected == normalizedActual)
+        {
+            return true;
+        }
+
+        return IsEsp32Family(normalizedExpected) && IsEsp32Family(normalizedActual);
     }
 
     private static T WithConnection<T>(string portName, int baudRate, TimeSpan timeout, Func<SerialPort, T> action)
@@ -244,7 +271,7 @@ public sealed class SerialProvisioningService
             {
                 var response = Request(connection, identifyPayload, TimeSpan.FromSeconds(4), 1);
                 var chip = ReadString(response, "chip").ToUpperInvariant();
-                if (chip is "ESP8266" or "ESP32")
+                if (IsSupportedChip(chip))
                 {
                     return;
                 }
@@ -333,7 +360,7 @@ public sealed class SerialProvisioningService
                 var identify = Request(connection, identifyPayload, TimeSpan.FromSeconds(3), 1);
                 var chip = ReadString(identify, "chip").ToUpperInvariant();
                 var lockId = ReadString(identify, "lock_id");
-                if (string.Equals(chip, expectedChip.Trim().ToUpperInvariant(), StringComparison.Ordinal)
+                if (ChipsMatch(expectedChip, chip)
                     && string.Equals(lockId, expectedLockId, StringComparison.OrdinalIgnoreCase))
                 {
                     identify["ok"] = true;

@@ -12,6 +12,7 @@ from app.modules.auth.service import AuthService
 from app.modules.biometrics.face_map import FaceMapError
 from app.modules.biometrics.service import FaceVerificationService, decode_data_url_image
 from app.modules.pms.connection_service import TravelLineConnectionService
+from app.modules.pms.grant_sync_service import TravelLineGrantSyncService
 from app.modules.pms.schemas.travelline import TravelLineConnectionConfig, TravelLineSyncRequest
 from app.modules.pms.services import TravelLineSyncService
 from app.modules.properties.service import PropertyService
@@ -66,6 +67,14 @@ def get_travelline_connection_service(
     return TravelLineConnectionService(db=db, encryption=encryption)
 
 
+def get_travelline_grant_sync_service(
+    db: Session = Depends(get_db),
+    encryption: EncryptionService = Depends(get_encryption_service),
+    settings: Settings = Depends(get_settings),
+) -> TravelLineGrantSyncService:
+    return TravelLineGrantSyncService(settings=settings, db=db, encryption=encryption)
+
+
 def render(request: Request, template_name: str, context: dict):
     templates = get_templates()
     return templates.TemplateResponse(request=request, name=template_name, context=context)
@@ -95,9 +104,9 @@ def _build_public_news() -> list[dict[str, str]]:
 async def _load_dashboard_data(
     *,
     user_email: str,
-    settings: Settings,
     property_service: PropertyService,
     travelline_connection_service: TravelLineConnectionService,
+    travelline_grant_sync_service: TravelLineGrantSyncService,
 ) -> dict[str, object]:
     reservations = []
     travelline_error = None
@@ -106,21 +115,9 @@ async def _load_dashboard_data(
 
     if connection is not None:
         try:
-            sync_service = TravelLineSyncService(settings=settings)
-            for property_id in travelline_connection_service.decrypt_property_ids(connection):
-                result = await sync_service.sync_reservations(
-                    TravelLineSyncRequest(limit=100),
-                    connection=TravelLineConnectionConfig(
-                        client_id=connection.client_id,
-                        client_secret=travelline_connection_service.decrypt_secret(connection),
-                        property_id=property_id,
-                        auth_url=connection.auth_url,
-                        api_base_url=connection.api_base_url,
-                        timeout_seconds=settings.travelline_timeout_seconds,
-                    ),
-                )
-                reservations.extend(result.reservations)
-            property_service.sync_access_grants(owner_email=user_email, reservations=reservations)
+            reservations = await travelline_grant_sync_service.sync_owner_connection(
+                owner_email=user_email
+            )
         except Exception as exc:
             travelline_error = str(exc)
 
@@ -215,7 +212,7 @@ async def login_submit(
         key=settings.session_cookie_name,
         value=auth_service.create_session_token(user),
         httponly=True,
-        secure=settings.session_cookie_secure,
+        secure=settings.session_cookie_secure and request.url.scheme == "https",
         samesite=settings.session_cookie_samesite,
         max_age=settings.session_persist_days * 24 * 60 * 60,
         expires=settings.session_persist_days * 24 * 60 * 60,
@@ -416,9 +413,9 @@ async def logout(settings: Settings = Depends(get_settings)):
 @router.get("/dashboard")
 async def user_dashboard(
     request: Request,
-    settings: Settings = Depends(get_settings),
     property_service: PropertyService = Depends(get_property_service),
     travelline_connection_service: TravelLineConnectionService = Depends(get_travelline_connection_service),
+    travelline_grant_sync_service: TravelLineGrantSyncService = Depends(get_travelline_grant_sync_service),
     access_log_service: AccessAttemptLogService = Depends(get_access_attempt_log_service),
 ):
     user = get_current_user(request)
@@ -429,9 +426,9 @@ async def user_dashboard(
 
     dashboard_data = await _load_dashboard_data(
         user_email=user.email,
-        settings=settings,
         property_service=property_service,
         travelline_connection_service=travelline_connection_service,
+        travelline_grant_sync_service=travelline_grant_sync_service,
     )
     connection_view = dashboard_data["travelline_connection"]
     return render(
@@ -453,9 +450,9 @@ async def user_dashboard(
 @router.get("/objects")
 async def objects_page(
     request: Request,
-    settings: Settings = Depends(get_settings),
     property_service: PropertyService = Depends(get_property_service),
     travelline_connection_service: TravelLineConnectionService = Depends(get_travelline_connection_service),
+    travelline_grant_sync_service: TravelLineGrantSyncService = Depends(get_travelline_grant_sync_service),
 ):
     user = get_current_user(request)
     if user is None:
@@ -465,9 +462,20 @@ async def objects_page(
 
     dashboard_data = await _load_dashboard_data(
         user_email=user.email,
-        settings=settings,
         property_service=property_service,
         travelline_connection_service=travelline_connection_service,
+        travelline_grant_sync_service=travelline_grant_sync_service,
+    )
+    return render(
+        request,
+        "objects.html",
+        {
+            "title": "РћР±СЉРµРєС‚С‹",
+            "user": user,
+            **dashboard_data,
+            "house_form": form_state(name="", address=""),
+            "door_form": form_state(house_id="", name="", lock_label="", travelline_unit_id=""),
+        },
     )
 
 
@@ -618,41 +626,55 @@ async def create_door(
 async def save_travelline_connection(
     request: Request,
     client_id: str = Form(...),
-    client_secret: str = Form(...),
+    client_secret: str = Form(""),
     property_ids: str = Form(""),
     travelline_connection_service: TravelLineConnectionService = Depends(get_travelline_connection_service),
-    property_service: PropertyService = Depends(get_property_service),
+    travelline_grant_sync_service: TravelLineGrantSyncService = Depends(get_travelline_grant_sync_service),
     settings: Settings = Depends(get_settings),
 ):
     user = get_current_user(request)
     if user is None or user.role == "admin":
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
-    sync_service = TravelLineSyncService(settings=settings)
-    base_connection = TravelLineConnectionConfig(
-        client_id=client_id.strip(),
-        client_secret=client_secret.strip(),
-        property_id="bootstrap",
-        auth_url=settings.travelline_auth_url,
-        api_base_url=settings.travelline_api_base_url,
-        timeout_seconds=settings.travelline_timeout_seconds,
-    )
+    existing_connection = travelline_connection_service.get_connection(user.email)
+    effective_secret = client_secret.strip()
+    if not effective_secret and existing_connection is not None:
+        effective_secret = travelline_connection_service.decrypt_secret(existing_connection)
 
-    catalog = await sync_service.fetch_properties_catalog(base_connection)
-    fetched_property_ids = [str(item.get("id", "")).strip() for item in catalog if str(item.get("id", "")).strip()]
-    selected_property_ids = [item.strip() for item in property_ids.split(",") if item.strip()]
-    final_property_ids = selected_property_ids or fetched_property_ids
+    try:
+        sync_service = TravelLineSyncService(settings=settings)
+        base_connection = TravelLineConnectionConfig(
+            client_id=client_id.strip(),
+            client_secret=effective_secret,
+            property_id="bootstrap",
+            auth_url=settings.travelline_auth_url,
+            api_base_url=settings.travelline_api_base_url,
+            timeout_seconds=settings.travelline_timeout_seconds,
+        )
 
-    travelline_connection_service.save_connection(
-        owner_email=user.email,
-        client_id=client_id,
-        client_secret=client_secret,
-        property_ids=final_property_ids,
-        auth_url=settings.travelline_auth_url,
-        api_base_url=settings.travelline_api_base_url,
+        catalog = await sync_service.fetch_properties_catalog(base_connection)
+        fetched_property_ids = [str(item.get("id", "")).strip() for item in catalog if str(item.get("id", "")).strip()]
+        selected_property_ids = [item.strip() for item in property_ids.split(",") if item.strip()]
+        final_property_ids = selected_property_ids or fetched_property_ids
+
+        travelline_connection_service.save_connection(
+            owner_email=user.email,
+            client_id=client_id,
+            client_secret=effective_secret,
+            property_ids=final_property_ids,
+            auth_url=settings.travelline_auth_url,
+            api_base_url=settings.travelline_api_base_url,
+        )
+        await travelline_grant_sync_service.sync_owner_connection(owner_email=user.email)
+    except (RuntimeError, ValueError) as exc:
+        return RedirectResponse(
+            url=f"/dashboard?error={quote(str(exc))}",
+            status_code=status.HTTP_302_FOUND,
+        )
+    return RedirectResponse(
+        url="/dashboard?success=TravelLine%20saved%20and%20auto-sync%20started",
+        status_code=status.HTTP_302_FOUND,
     )
-    property_service.sync_houses_from_travelline(owner_email=user.email, properties=catalog)
-    return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 
 
 @router.get("/admin/dashboard")

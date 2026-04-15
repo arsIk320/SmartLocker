@@ -104,6 +104,9 @@ def face_status_summary(booking: dict, index: int) -> str:
         f"{index}. {booking['reservation_external_id']}\n"
         f"   {booking['house_name']} / {booking['door_name']} - {status}"
     )
+    faces_count = booking.get("face_profile_faces_count")
+    if faces_count and status == "processed":
+        summary += f" (faces={int(faces_count)})"
     quality = booking.get("face_profile_quality_score")
     if quality is not None and status == "processed":
         summary += f" (quality={float(quality):.2f})"
@@ -405,6 +408,9 @@ async def create_dispatcher(api_client: SmartLockerTelegramApiClient) -> Dispatc
             f"ID заявки: {result['submission_id']}\n"
             f"Статус: {status_text}"
         )
+        faces_count = result.get("faces_count")
+        if faces_count:
+            response_text += f"\nfaces={int(faces_count)}"
         error_text = str(result.get("processing_error") or "").strip()
         if error_text:
             response_text += f"\nОшибка: {error_text}"

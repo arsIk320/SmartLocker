@@ -314,6 +314,7 @@ async def verify_face_for_lock(
         "confidence": result.confidence,
         "threshold": result.threshold,
         "stored_quality_score": result.stored_quality_score,
+        "stored_faces_count": result.stored_faces_count,
         "probe_quality_score": result.probe_quality_score,
         "image_received": True,
     }

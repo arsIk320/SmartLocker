@@ -42,7 +42,11 @@ class TravelLineConnectionService:
             self._db.add(connection)
 
         connection.client_id = client_id.strip()
-        connection.client_secret_encrypted = self._encryption.encrypt(client_secret.strip())
+        normalized_secret = client_secret.strip()
+        if normalized_secret:
+            connection.client_secret_encrypted = self._encryption.encrypt(normalized_secret)
+        elif not connection.client_secret_encrypted:
+            raise ValueError("Укажите Client Secret TravelLine.")
         connection.property_ids_encrypted = self._encryption.encrypt(
             ",".join(normalized_property_ids)
         )
@@ -57,6 +61,16 @@ class TravelLineConnectionService:
             self._db.query(TravelLineConnectionModel)
             .filter(TravelLineConnectionModel.owner_email == owner_email.strip().lower())
             .one_or_none()
+        )
+
+    def list_connections(self) -> list[TravelLineConnectionModel]:
+        return (
+            self._db.query(TravelLineConnectionModel)
+            .order_by(
+                TravelLineConnectionModel.updated_at.desc(),
+                TravelLineConnectionModel.created_at.desc(),
+            )
+            .all()
         )
 
     def export_view(self, owner_email: str) -> dict[str, str] | None:

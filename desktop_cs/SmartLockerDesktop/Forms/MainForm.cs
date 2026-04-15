@@ -348,9 +348,9 @@ public sealed class MainForm : Form
             {
                 _esp8266TextBox.Text = _serialService.GenerateBoardUid("ESP8266");
             }
-            if (_detectedBoard.Chip == "ESP32" && string.IsNullOrWhiteSpace(_esp32TextBox.Text))
+            if ((_detectedBoard.Chip == "ESP32" || _detectedBoard.Chip == "ESP32-CAM") && string.IsNullOrWhiteSpace(_esp32TextBox.Text))
             {
-                _esp32TextBox.Text = _serialService.GenerateBoardUid("ESP32");
+                _esp32TextBox.Text = _serialService.GenerateBoardUid(_detectedBoard.Chip);
             }
             return;
         }
@@ -406,7 +406,7 @@ public sealed class MainForm : Form
 
         GenerateIds(detectedOnly: true);
         var chip = _detectedBoard.Chip ?? string.Empty;
-        var boardUid = chip == "ESP32" ? _esp32TextBox.Text.Trim() : _esp8266TextBox.Text.Trim();
+        var boardUid = (chip == "ESP32" || chip == "ESP32-CAM") ? _esp32TextBox.Text.Trim() : _esp8266TextBox.Text.Trim();
         var lockId = _lockIdTextBox.Text.Trim();
         var wifiSsid = _wifiCombo.Text.Trim();
         var wifiPassword = _wifiPasswordTextBox.Text;

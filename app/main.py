@@ -1,4 +1,6 @@
-from contextlib import asynccontextmanager
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -7,6 +9,7 @@ from app.api.routes import api_router
 from app.core.config import get_settings
 from app.db import create_session_factory, init_db
 from app.modules.auth.service import AuthService
+from app.modules.pms.grant_sync_service import TravelLineGrantSyncService
 from app.services.encryption import EncryptionService
 from app.modules.web.routes import router as web_router
 from app.modules.web.lock_routes import router as lock_router
@@ -14,10 +17,46 @@ from app.web import STATIC_DIR
 from max_bot.main import create_runtime as create_max_runtime, shutdown_runtime as shutdown_max_runtime
 from telegram_bot.main import create_runtime as create_telegram_runtime, shutdown_runtime as shutdown_telegram_runtime
 
+logger = logging.getLogger(__name__)
+
+
+async def _run_travelline_sync_once(app: FastAPI) -> None:
+    settings = app.state.settings
+    db = app.state.session_factory()
+    try:
+        service = TravelLineGrantSyncService(
+            settings=settings,
+            db=db,
+            encryption=app.state.encryption_service,
+        )
+        synced = await service.sync_all_connections()
+        if synced:
+            logger.info("TravelLine auto-sync refreshed %s reservations.", synced)
+    finally:
+        db.close()
+
+
+async def _travelline_auto_sync_loop(app: FastAPI) -> None:
+    interval = max(15, int(app.state.settings.travelline_auto_sync_interval_seconds))
+    while True:
+        try:
+            await _run_travelline_sync_once(app)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("TravelLine auto-sync loop failed.")
+        await asyncio.sleep(interval)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = app.state.settings
+    travelline_sync_task = None
+    if settings.travelline_auto_sync_enabled:
+        travelline_sync_task = asyncio.create_task(_travelline_auto_sync_loop(app))
+        app.state.travelline_sync_task = travelline_sync_task
+    else:
+        app.state.travelline_sync_task = None
     telegram_runtime = None
     telegram_webhook_base_url = (settings.telegram_bot_webhook_base_url or "").strip().rstrip("/")
     if settings.telegram_bot_token and telegram_webhook_base_url:
@@ -53,6 +92,10 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        if travelline_sync_task is not None:
+            travelline_sync_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await travelline_sync_task
         if max_runtime is not None:
             try:
                 await max_runtime.platform_client.delete_webhook(url=max_webhook_url)

@@ -42,6 +42,7 @@ class BindLockRequest(BaseModel):
 
 
 class SaveLockRequest(BaseModel):
+    device_id: str | None = None
     lock_id: str
     device_name: str
     wifi_ssid: str
@@ -233,6 +234,7 @@ async def save_lock(
     try:
         device = lock_device_service.save_device(
             user.email,
+            device_id=payload.device_id,
             lock_id=payload.lock_id,
             device_name=payload.device_name,
             wifi_ssid=payload.wifi_ssid,
@@ -255,6 +257,19 @@ async def save_lock(
         "device": lock_device_service.export_view(device),
         "provisioning": lock_device_service.export_provisioning_view(device, api_base_url=api_base_url),
     }
+
+
+@router.delete("/locks/{device_id}")
+async def delete_lock(
+    device_id: str,
+    user=Depends(require_api_user),
+    lock_device_service: LockDeviceService = Depends(get_lock_device_service),
+):
+    try:
+        lock_device_service.delete_device(user.email, device_id=device_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return {"ok": True, "deleted": True, "device_id": device_id}
 
 
 @router.get("/admin/users")
