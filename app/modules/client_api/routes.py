@@ -49,8 +49,7 @@ class SaveLockRequest(BaseModel):
     wifi_password: str
     port_name: str = ""
     door_id: str | None = None
-    esp8266_uid: str = ""
-    esp32_uid: str = ""
+    board_uid: str = Field(default="", min_length=1)
 
 
 class RotateQrResponse(BaseModel):
@@ -241,8 +240,7 @@ async def save_lock(
             wifi_password=payload.wifi_password,
             port_name=payload.port_name,
             door_id=payload.door_id,
-            esp8266_uid=payload.esp8266_uid,
-            esp32_uid=payload.esp32_uid,
+            board_uid=payload.board_uid,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

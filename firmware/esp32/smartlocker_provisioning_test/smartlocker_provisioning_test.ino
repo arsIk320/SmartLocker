@@ -55,6 +55,7 @@ constexpr BaseType_t CONTROL_TASK_CORE = 0;
 constexpr char PROTOCOL_NAME[] = "smartlocker-provisioning-v1";
 constexpr char FIRMWARE_VERSION[] = "0.4.0-esp32-dual-core-lock";
 constexpr char DEFAULT_BOARD_UID[] = "TEMP-BOOT";
+constexpr char DEFAULT_API_BASE_URL[] = "http://188.130.251.23";
 constexpr char PREFS_NAMESPACE[] = "smartlocker";
 constexpr char PREFS_KEY_CONFIG[] = "config";
 constexpr uint8_t LCD_COLUMNS = 16;
@@ -359,6 +360,7 @@ void clearConfig(DeviceConfig &config) {
   config.magic = CONFIG_MAGIC;
   strlcpy(config.chip, "ESP32", sizeof(config.chip));
   strlcpy(config.boardUid, DEFAULT_BOARD_UID, sizeof(config.boardUid));
+  strlcpy(config.apiBaseUrl, DEFAULT_API_BASE_URL, sizeof(config.apiBaseUrl));
 }
 
 void saveConfig(const DeviceConfig &config) {

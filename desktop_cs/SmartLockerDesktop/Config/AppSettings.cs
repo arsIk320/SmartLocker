@@ -18,7 +18,7 @@ public sealed class AppSettings
         var apiBaseUrl = FirstNonBlank(
             Read(values, "SMARTLOCKER_API_BASE_URL"),
             Read(values, "PROVISIONING_API_BASE_URL"),
-            "https://smartlocker-api-mg03.onrender.com");
+            "http://188.130.251.23");
 
         return new AppSettings
         {

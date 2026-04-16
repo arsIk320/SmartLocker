@@ -19,6 +19,7 @@ constexpr size_t LOG_CAPACITY = 24;
 constexpr char PROTOCOL_NAME[] = "smartlocker-provisioning-v1";
 constexpr char FIRMWARE_VERSION[] = "0.2.0-unified";
 constexpr char DEFAULT_BOARD_UID[] = "TEMP-BOOT";
+constexpr char DEFAULT_API_BASE_URL[] = "http://188.130.251.23";
 
 struct DeviceConfig {
   uint32_t magic;
@@ -120,6 +121,7 @@ void clearConfig(DeviceConfig &config) {
   config.magic = EEPROM_MAGIC;
   strlcpy(config.chip, "ESP8266", sizeof(config.chip));
   strlcpy(config.boardUid, DEFAULT_BOARD_UID, sizeof(config.boardUid));
+  strlcpy(config.apiBaseUrl, DEFAULT_API_BASE_URL, sizeof(config.apiBaseUrl));
 }
 
 void saveConfig(const DeviceConfig &config) {

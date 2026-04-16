@@ -20,8 +20,7 @@ public sealed class MainForm : Form
     private readonly ComboBox _wifiCombo = new() { Width = 280, DropDownStyle = ComboBoxStyle.DropDown };
     private readonly ComboBox _doorCombo = new() { Width = 360, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly TextBox _lockIdTextBox = new() { Width = 260 };
-    private readonly TextBox _esp8266TextBox = new() { Width = 260 };
-    private readonly TextBox _esp32TextBox = new() { Width = 260 };
+    private readonly TextBox _boardUidTextBox = new() { Width = 260 };
     private readonly TextBox _deviceNameTextBox = new() { Width = 260 };
     private readonly TextBox _wifiPasswordTextBox = new() { Width = 260, UseSystemPasswordChar = true };
     private readonly Label _boardInfoLabel = new() { AutoSize = true, MaximumSize = new Size(560, 0) };
@@ -128,9 +127,8 @@ public sealed class MainForm : Form
         left.Controls.Add(BuildPortRow());
         left.Controls.Add(BuildDetectRow());
         left.Controls.Add(_boardInfoLabel);
-        left.Controls.Add(LabeledField("Общий Lock ID", _lockIdTextBox));
-        left.Controls.Add(LabeledField("UID платы ESP8266", _esp8266TextBox));
-        left.Controls.Add(LabeledField("UID платы ESP32", _esp32TextBox));
+        left.Controls.Add(LabeledField("Lock ID платы", _lockIdTextBox));
+        left.Controls.Add(LabeledField("UID текущей платы", _boardUidTextBox));
         left.Controls.Add(LabeledField("Название замка", _deviceNameTextBox));
         left.Controls.Add(LabeledField("Дверь", _doorCombo));
         left.Controls.Add(BuildWifiRow());
@@ -344,24 +342,16 @@ public sealed class MainForm : Form
 
         if (detectedOnly && _detectedBoard is not null)
         {
-            if (_detectedBoard.Chip == "ESP8266" && string.IsNullOrWhiteSpace(_esp8266TextBox.Text))
+            if ((_detectedBoard.Chip == "ESP32" || _detectedBoard.Chip == "ESP32-CAM") && string.IsNullOrWhiteSpace(_boardUidTextBox.Text))
             {
-                _esp8266TextBox.Text = _serialService.GenerateBoardUid("ESP8266");
-            }
-            if ((_detectedBoard.Chip == "ESP32" || _detectedBoard.Chip == "ESP32-CAM") && string.IsNullOrWhiteSpace(_esp32TextBox.Text))
-            {
-                _esp32TextBox.Text = _serialService.GenerateBoardUid(_detectedBoard.Chip);
+                _boardUidTextBox.Text = _serialService.GenerateBoardUid(_detectedBoard.Chip);
             }
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_esp8266TextBox.Text))
+        if (string.IsNullOrWhiteSpace(_boardUidTextBox.Text))
         {
-            _esp8266TextBox.Text = _serialService.GenerateBoardUid("ESP8266");
-        }
-        if (string.IsNullOrWhiteSpace(_esp32TextBox.Text))
-        {
-            _esp32TextBox.Text = _serialService.GenerateBoardUid("ESP32");
+            _boardUidTextBox.Text = _serialService.GenerateBoardUid("ESP32");
         }
     }
 
@@ -406,7 +396,7 @@ public sealed class MainForm : Form
 
         GenerateIds(detectedOnly: true);
         var chip = _detectedBoard.Chip ?? string.Empty;
-        var boardUid = (chip == "ESP32" || chip == "ESP32-CAM") ? _esp32TextBox.Text.Trim() : _esp8266TextBox.Text.Trim();
+        var boardUid = _boardUidTextBox.Text.Trim();
         var lockId = _lockIdTextBox.Text.Trim();
         var wifiSsid = _wifiCombo.Text.Trim();
         var wifiPassword = _wifiPasswordTextBox.Text;
@@ -435,8 +425,7 @@ public sealed class MainForm : Form
                 wifiPassword,
                 _portCombo.SelectedItem?.ToString() ?? string.Empty,
                 doorId,
-                _esp8266TextBox.Text.Trim(),
-                _esp32TextBox.Text.Trim());
+                boardUid);
 
             var effectiveApiBaseUrl = string.IsNullOrWhiteSpace(_settings.ProvisioningApiBaseUrl)
                 ? saveResult.Provisioning.ApiBaseUrl
@@ -466,6 +455,9 @@ public sealed class MainForm : Form
             };
             ApplyLocks(await _apiClient.ListLocksAsync());
             FillLastProvisioning();
+            _lockIdTextBox.Clear();
+            _boardUidTextBox.Clear();
+            GenerateIds();
             UpdateActivationProgress(100, "Активация завершена.");
 
             MessageBox.Show(
@@ -576,15 +568,7 @@ public sealed class MainForm : Form
         _locksGrid.Rows.Clear();
         foreach (var device in devices)
         {
-            var boards = new List<string>();
-            if (!string.IsNullOrWhiteSpace(device.Esp8266Uid))
-            {
-                boards.Add($"ESP8266: {device.Esp8266Uid}");
-            }
-            if (!string.IsNullOrWhiteSpace(device.Esp32Uid))
-            {
-                boards.Add($"ESP32: {device.Esp32Uid}");
-            }
+            var boardUid = device.BoardUid ?? string.Empty;
 
             var door = string.IsNullOrWhiteSpace(device.DoorName)
                 ? "Не привязан"
@@ -593,7 +577,7 @@ public sealed class MainForm : Form
             _locksGrid.Rows.Add(
                 device.DeviceName,
                 device.LockId,
-                string.Join(", ", boards),
+                boardUid,
                 device.WifiSsid,
                 door,
                 device.PortName,

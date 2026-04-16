@@ -28,7 +28,7 @@ class SerialProvisioningService:
     PROTOCOL_NAME = "smartlocker-provisioning-v1"
     READ_POLL_TIMEOUT = 0.25
     PREPARE_DELAY_SECONDS = 0.35
-    SUPPORTED_CHIPS = {"ESP8266", "ESP32", "ESP32-CAM"}
+    SUPPORTED_CHIPS = {"ESP32", "ESP32-CAM"}
     ESP32_FAMILY = {"ESP32", "ESP32-CAM"}
 
     def list_ports(self) -> list[SerialBoardInfo]:
@@ -115,7 +115,7 @@ class SerialProvisioningService:
     ) -> dict[str, object]:
         normalized_chip = chip.strip().upper()
         if normalized_chip not in self.SUPPORTED_CHIPS:
-            raise ValueError("Для записи конфигурации нужен chip ESP8266 или ESP32.")
+            raise ValueError("Для записи конфигурации нужен chip ESP32 или ESP32-CAM.")
 
         payload = {
             "action": "provision",
@@ -150,7 +150,7 @@ class SerialProvisioningService:
         elif normalized_chip in SerialProvisioningService.ESP32_FAMILY:
             prefix = "ESP32"
         else:
-            prefix = "ESP8266"
+            prefix = "ESP32"
         return f"{prefix}-{secrets.token_hex(4).upper()}"
 
     def _lookup_port(self, port_name: str) -> SerialBoardInfo:

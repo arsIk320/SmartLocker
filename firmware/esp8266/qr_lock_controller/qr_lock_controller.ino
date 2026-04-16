@@ -6,7 +6,7 @@
 namespace {
 constexpr char WIFI_SSID[] = "REPLACE_WITH_WIFI_SSID";
 constexpr char WIFI_PASSWORD[] = "REPLACE_WITH_WIFI_PASSWORD";
-constexpr char QR_URL[] = "https://smartlocker-cvry.onrender.com/api/v1/locks/qr/current";
+constexpr char QR_URL[] = "http://188.130.251.23/api/v1/locks/qr/current";
 constexpr char LOCK_ID[] = "LOCK-REPLACE-ME";
 constexpr char LOCK_API_KEY[] = "REPLACE_WITH_LOCK_API_KEY";
 

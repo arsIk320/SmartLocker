@@ -222,8 +222,7 @@ class MainWidget(QWidget):
         self.port_combo = QComboBox()
         self.wifi_combo = QComboBox()
         self.lock_id_edit = QLineEdit()
-        self.esp8266_uid_edit = QLineEdit()
-        self.esp32_uid_edit = QLineEdit()
+        self.board_uid_edit = QLineEdit()
         self.device_name_edit = QLineEdit()
         self.wifi_password_edit = QLineEdit()
         self.wifi_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
@@ -262,9 +261,8 @@ class MainWidget(QWidget):
 
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
-        form.addRow("Общий Lock ID", self.lock_id_edit)
-        form.addRow("UID платы ESP8266", self.esp8266_uid_edit)
-        form.addRow("UID платы ESP32", self.esp32_uid_edit)
+        form.addRow("Lock ID платы", self.lock_id_edit)
+        form.addRow("UID текущей платы", self.board_uid_edit)
         form.addRow("Название замка", self.device_name_edit)
         form.addRow("Дверь", self.door_combo)
 
@@ -644,10 +642,8 @@ class MainWidget(QWidget):
         self.devices_table.setRowCount(0)
         for device in devices:
             boards = []
-            if device["esp8266_uid"]:
-                boards.append(f"ESP8266: {device['esp8266_uid']}")
-            if device["esp32_uid"]:
-                boards.append(f"ESP32: {device['esp32_uid']}")
+            if device.get("board_uid"):
+                boards.append(str(device["board_uid"]))
             door_label = "Не привязан"
             if device["door_name"]:
                 door_label = f"{device['house_name']} / {device['door_name']}"
@@ -684,8 +680,7 @@ class MainWidget(QWidget):
             return
         self.selected_device_id = str(device.get("id", "")).strip() or None
         self.lock_id_edit.setText(str(device.get("lock_id", "")))
-        self.esp8266_uid_edit.setText(str(device.get("esp8266_uid", "")))
-        self.esp32_uid_edit.setText(str(device.get("esp32_uid", "")))
+        self.board_uid_edit.setText(str(device.get("board_uid", "")))
         self.device_name_edit.setText(str(device.get("device_name", "")))
         self.wifi_combo.setCurrentText(str(device.get("wifi_ssid", "")))
         self.wifi_password_edit.clear()
@@ -816,10 +811,8 @@ class MainWidget(QWidget):
             self.window.show_status(f"Обнаружена плата {board.chip} на {board.port}.")
             detected_board_uid = (board.board_uid or "").strip()
             if detected_board_uid and not detected_board_uid.endswith("-TEMP"):
-                if board.chip == "ESP8266" and not self.esp8266_uid_edit.text().strip():
-                    self.esp8266_uid_edit.setText(detected_board_uid)
-                if board.chip in {"ESP32", "ESP32-CAM"} and not self.esp32_uid_edit.text().strip():
-                    self.esp32_uid_edit.setText(detected_board_uid)
+                if board.chip in {"ESP32", "ESP32-CAM"} and not self.board_uid_edit.text().strip():
+                    self.board_uid_edit.setText(detected_board_uid)
             self.generate_ids(for_detected_only=True)
 
         def on_error(message: str) -> None:
@@ -846,15 +839,11 @@ class MainWidget(QWidget):
         if not self.lock_id_edit.text().strip():
             self.lock_id_edit.setText(self.window.serial_service.generate_lock_id())
         if for_detected_only and self.detected_board:
-            if self.detected_board.chip == "ESP8266" and not self.esp8266_uid_edit.text().strip():
-                self.esp8266_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP8266"))
-            if self.detected_board.chip in {"ESP32", "ESP32-CAM"} and not self.esp32_uid_edit.text().strip():
-                self.esp32_uid_edit.setText(self.window.serial_service.generate_board_uid(self.detected_board.chip))
+            if self.detected_board.chip in {"ESP32", "ESP32-CAM"} and not self.board_uid_edit.text().strip():
+                self.board_uid_edit.setText(self.window.serial_service.generate_board_uid(self.detected_board.chip))
             return
-        if not self.esp8266_uid_edit.text().strip():
-            self.esp8266_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP8266"))
-        if not self.esp32_uid_edit.text().strip():
-            self.esp32_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP32"))
+        if not self.board_uid_edit.text().strip():
+            self.board_uid_edit.setText(self.window.serial_service.generate_board_uid("ESP32"))
 
     def add_house(self) -> None:
         try:
@@ -915,15 +904,11 @@ class MainWidget(QWidget):
             progress_callback({"percent": 5, "message": "Проверяем данные активации..."})
         self.generate_ids(for_detected_only=True)
         chip = self.detected_board.chip or ""
-        board_uid = (
-            self.esp32_uid_edit.text().strip()
-            if chip in {"ESP32", "ESP32-CAM"}
-            else self.esp8266_uid_edit.text().strip()
-        )
+        board_uid = self.board_uid_edit.text().strip()
         wifi_ssid = self.wifi_combo.currentText().strip()
 
         if not self.lock_id_edit.text().strip():
-            raise ValueError("Не заполнен общий Lock ID.")
+            raise ValueError("Не заполнен Lock ID платы.")
         if not board_uid:
             raise ValueError(f"Не заполнен UID для платы {chip}.")
         if not wifi_ssid:
@@ -946,8 +931,7 @@ class MainWidget(QWidget):
                 wifi_password=self.wifi_password_edit.text(),
                 port_name=self.port_combo.currentText(),
                 door_id=door_id,
-                esp8266_uid=self.esp8266_uid_edit.text(),
-                esp32_uid=self.esp32_uid_edit.text(),
+                board_uid=board_uid,
             )
             provisioning = save_result.get("provisioning")
         else:
@@ -964,8 +948,7 @@ class MainWidget(QWidget):
                     wifi_password=self.wifi_password_edit.text(),
                     port_name=self.port_combo.currentText(),
                     door_id=door_id,
-                    esp8266_uid=self.esp8266_uid_edit.text(),
-                    esp32_uid=self.esp32_uid_edit.text(),
+                    board_uid=board_uid,
                 )
                 provisioning = service.export_provisioning_view(
                     device,
@@ -1007,6 +990,9 @@ class MainWidget(QWidget):
             self.clear_overwrite_target()
             self.refresh_devices()
             self.fill_last_provisioning()
+            self.lock_id_edit.clear()
+            self.board_uid_edit.clear()
+            self.generate_ids()
             self.window.show_status(
                 f"Плата {result['chip']} активирована на {result['port']}, замок сохранён в сервисе. "
                 f"Ответ: {result['response'].get('status', 'ok')}"

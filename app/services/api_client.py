@@ -83,8 +83,7 @@ class SmartLockerApiClient:
         wifi_password: str,
         port_name: str = "",
         door_id: str | None = None,
-        esp8266_uid: str = "",
-        esp32_uid: str = "",
+        board_uid: str,
     ) -> dict:
         response = self._request(
             "POST",
@@ -98,8 +97,7 @@ class SmartLockerApiClient:
                 "wifi_password": wifi_password,
                 "port_name": port_name,
                 "door_id": door_id,
-                "esp8266_uid": esp8266_uid,
-                "esp32_uid": esp32_uid,
+                "board_uid": board_uid,
             },
         )
         return response.json()

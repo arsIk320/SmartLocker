@@ -43,6 +43,7 @@ constexpr size_t LOG_CAPACITY = 32;
 constexpr char PROTOCOL_NAME[] = "smartlocker-provisioning-v1";
 constexpr char FIRMWARE_VERSION[] = "0.2.0-face-cam-uart";
 constexpr char DEFAULT_BOARD_UID[] = "ESP32CAM-TEMP";
+constexpr char DEFAULT_API_BASE_URL[] = "http://188.130.251.23";
 constexpr char PREFERENCES_NS[] = "smartlocker";
 
 struct DeviceConfig {
@@ -155,6 +156,7 @@ void clearConfig(DeviceConfig &config) {
   memset(&config, 0, sizeof(config));
   strlcpy(config.chip, "ESP32-CAM", sizeof(config.chip));
   strlcpy(config.boardUid, DEFAULT_BOARD_UID, sizeof(config.boardUid));
+  strlcpy(config.apiBaseUrl, DEFAULT_API_BASE_URL, sizeof(config.apiBaseUrl));
 }
 
 void saveConfig() {

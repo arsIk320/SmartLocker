@@ -164,14 +164,14 @@ public sealed class SerialProvisioningService
         {
             "ESP32-CAM" => "ESP32CAM",
             "ESP32" => "ESP32",
-            _ => "ESP8266",
+            _ => "ESP32",
         };
         return $"{prefix}-{RandomNumberGenerator.GetHexString(4)}";
     }
 
     private static bool IsSupportedChip(string chip)
     {
-        return chip is "ESP8266" or "ESP32" or "ESP32-CAM";
+        return chip is "ESP32" or "ESP32-CAM";
     }
 
     private static bool IsEsp32Family(string chip)

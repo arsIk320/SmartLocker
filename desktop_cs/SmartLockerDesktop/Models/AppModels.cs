@@ -127,11 +127,8 @@ public sealed class LockDeviceView
     [JsonPropertyName("device_name")]
     public string DeviceName { get; set; } = string.Empty;
 
-    [JsonPropertyName("esp8266_uid")]
-    public string? Esp8266Uid { get; set; }
-
-    [JsonPropertyName("esp32_uid")]
-    public string? Esp32Uid { get; set; }
+    [JsonPropertyName("board_uid")]
+    public string? BoardUid { get; set; }
 
     [JsonPropertyName("wifi_ssid")]
     public string WifiSsid { get; set; } = string.Empty;

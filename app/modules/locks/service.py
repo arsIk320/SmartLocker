@@ -25,15 +25,12 @@ class LockDeviceService:
         wifi_password: str,
         port_name: str = "",
         door_id: str | None = None,
-        esp8266_uid: str = "",
-        esp32_uid: str = "",
+        board_uid: str = "",
     ) -> LockDeviceModel:
         owner_key = owner_email.strip().lower()
         normalized_lock_id = self._normalize_uid(lock_id)
         lock_id_hash = self._hash_uid(normalized_lock_id)
-        normalized_esp8266_uid = self._normalize_optional_uid(esp8266_uid)
-        normalized_esp32_uid = self._normalize_optional_uid(esp32_uid)
-        normalized_device_uid = normalized_esp32_uid or normalized_esp8266_uid or normalized_lock_id
+        normalized_device_uid = self._normalize_uid(board_uid)
         uid_hash = self._hash_uid(normalized_device_uid)
         generated_api_key: str | None = None
 
@@ -86,8 +83,8 @@ class LockDeviceService:
                 lock_id_encrypted=self._encryption.encrypt(normalized_lock_id),
                 device_uid_hash=uid_hash,
                 device_uid_encrypted=self._encryption.encrypt(normalized_device_uid),
-                esp8266_uid_encrypted=self._encrypt_optional(normalized_esp8266_uid),
-                esp32_uid_encrypted=self._encrypt_optional(normalized_esp32_uid),
+                esp8266_uid_encrypted=None,
+                esp32_uid_encrypted=self._encryption.encrypt(normalized_device_uid),
                 device_name_encrypted=self._encryption.encrypt(device_name.strip()),
                 wifi_ssid_encrypted=self._encryption.encrypt(wifi_ssid.strip()),
                 wifi_password_encrypted=self._encryption.encrypt(wifi_password),
@@ -104,8 +101,8 @@ class LockDeviceService:
             device.lock_id_encrypted = self._encryption.encrypt(normalized_lock_id)
             device.device_uid_hash = uid_hash
             device.device_uid_encrypted = self._encryption.encrypt(normalized_device_uid)
-            device.esp8266_uid_encrypted = self._encrypt_optional(normalized_esp8266_uid)
-            device.esp32_uid_encrypted = self._encrypt_optional(normalized_esp32_uid)
+            device.esp8266_uid_encrypted = None
+            device.esp32_uid_encrypted = self._encryption.encrypt(normalized_device_uid)
             device.device_name_encrypted = self._encryption.encrypt(device_name.strip())
             device.wifi_ssid_encrypted = self._encryption.encrypt(wifi_ssid.strip())
             device.wifi_password_encrypted = self._encryption.encrypt(wifi_password)
@@ -163,8 +160,9 @@ class LockDeviceService:
             "door_id": device.door_id or "",
             "lock_id": self._encryption.decrypt(device.lock_id_encrypted),
             "has_api_key": bool(device.api_key_hash),
+            "board_uid": self._encryption.decrypt(device.device_uid_encrypted),
             "device_uid": self._encryption.decrypt(device.device_uid_encrypted),
-            "esp8266_uid": self._decrypt_optional(device.esp8266_uid_encrypted),
+            "esp8266_uid": "",
             "esp32_uid": self._decrypt_optional(device.esp32_uid_encrypted),
             "device_name": self._encryption.decrypt(device.device_name_encrypted),
             "wifi_ssid": self._encryption.decrypt(device.wifi_ssid_encrypted),

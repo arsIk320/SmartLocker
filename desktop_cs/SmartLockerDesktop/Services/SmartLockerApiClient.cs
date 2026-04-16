@@ -82,8 +82,7 @@ public sealed class SmartLockerApiClient : IDisposable
         string wifiPassword,
         string portName,
         string? doorId,
-        string esp8266Uid,
-        string esp32Uid,
+        string boardUid,
         CancellationToken cancellationToken = default)
     {
         using var request = CreateAuthorizedRequest(HttpMethod.Post, "/api/v1/client/locks");
@@ -95,8 +94,7 @@ public sealed class SmartLockerApiClient : IDisposable
             wifi_password = wifiPassword,
             port_name = portName,
             door_id = doorId,
-            esp8266_uid = esp8266Uid,
-            esp32_uid = esp32Uid,
+            board_uid = boardUid,
         });
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         return await ReadPayloadAsync<SaveLockEnvelope>(response, cancellationToken);

@@ -40,6 +40,7 @@ constexpr int FRAME_FLUSH_COUNT = 3;
 constexpr char PROTOCOL_NAME[] = "smartlocker-provisioning-v1";
 constexpr char FIRMWARE_VERSION[] = "0.1.0-face-cam";
 constexpr char DEFAULT_BOARD_UID[] = "ESP32CAM-TEMP";
+constexpr char DEFAULT_API_BASE_URL[] = "http://188.130.251.23";
 
 struct DeviceConfig {
   char chip[16];
@@ -88,6 +89,7 @@ void clearConfig(DeviceConfig &config) {
   memset(&config, 0, sizeof(config));
   strlcpy(config.chip, "ESP32", sizeof(config.chip));
   strlcpy(config.boardUid, DEFAULT_BOARD_UID, sizeof(config.boardUid));
+  strlcpy(config.apiBaseUrl, DEFAULT_API_BASE_URL, sizeof(config.apiBaseUrl));
 }
 
 void loadConfig() {
@@ -102,7 +104,7 @@ void loadConfig() {
   String ownerEmail = g_preferences.getString("owner_email", "");
   String doorUid = g_preferences.getString("door_uid", "");
   String apiKey = g_preferences.getString("api_key", "");
-  String apiBaseUrl = g_preferences.getString("api_base_url", "");
+  String apiBaseUrl = g_preferences.getString("api_base_url", DEFAULT_API_BASE_URL);
   String bookingCode = g_preferences.getString("booking_code", "");
   g_preferences.end();
 
