@@ -12,27 +12,57 @@
             <span class="brand-mark">SL</span>
             <span>SmartLocker</span>
         </a>
-        <nav class="app-nav">
-            {% if user and user.role != "admin" %}
-            <a href="/dashboard">Dashboard</a>
-            <a href="/objects">Objects</a>
-            <a href="/face-test">Face Test</a>
-            {% elif user and user.role == "admin" %}
-            <a href="/admin/dashboard">Admin</a>
-            {% endif %}
-        </nav>
+        {% if user %}
+        <button
+            class="app-menu-button"
+            type="button"
+            aria-label="Открыть меню"
+            aria-expanded="false"
+            data-menu-toggle
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        {% elif request.url.path not in ["/login", "/register"] %}
         <div class="app-header-right">
-            {% if user %}
-            <span class="app-user">{{ user.full_name }}</span>
-            <a class="btn ghost" href="/logout">Выйти</a>
-            {% else %}
             <a class="btn ghost" href="/login">Войти</a>
             <a class="btn ghost" href="/register">Регистрация</a>
-            {% endif %}
         </div>
+        {% endif %}
     </header>
+
+    {% if user %}
+    {% set dashboard_url = "/admin/dashboard" if user.role == "admin" else "/dashboard" %}
+    <div class="app-drawer-backdrop" data-menu-close></div>
+    <aside class="app-drawer" aria-hidden="true" data-drawer>
+        <div class="app-drawer-inner">
+            <a class="app-account-card" href="{{ dashboard_url }}">
+                <span class="eyebrow">Мой аккаунт</span>
+                <strong>{{ user.full_name }}</strong>
+                <span>{{ user.email }}</span>
+            </a>
+
+            <nav class="app-drawer-nav">
+                {% if user.role == "admin" %}
+                <a href="/admin/dashboard">Dashboard</a>
+                {% else %}
+                <a href="/dashboard">Dashboard</a>
+                <a href="/objects">Objects</a>
+                <a href="/face-test">FaceTest</a>
+                {% endif %}
+            </nav>
+
+            <div class="app-drawer-footer">
+                <a class="btn danger app-logout-button" href="/logout">Выйти</a>
+            </div>
+        </div>
+    </aside>
+    {% endif %}
+
     <main class="app-content">
         {% block content %}{% endblock %}
     </main>
+    <script src="/static/app.js"></script>
 </body>
 </html>

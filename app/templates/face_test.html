@@ -3,11 +3,11 @@
 <section class="panel">
     <div class="section-head">
         <div>
-            <p class="section-kicker">Р‘РРћРњР•РўР РРЇ</p>
-            <h2>РўРµСЃС‚ СЃСЂР°РІРЅРµРЅРёСЏ Р»РёС†Р°</h2>
+            <p class="section-kicker">Биометрия</p>
+            <h2>Тест сравнения лица</h2>
         </div>
     </div>
-    <p class="muted-copy">РЎС‚СЂР°РЅРёС†Р° Р±РµСЂС‘С‚ РєР°РґСЂ СЃ РєР°РјРµСЂС‹ РџРљ Рё СЃСЂР°РІРЅРёРІР°РµС‚ РµРіРѕ СЃ СѓР¶Рµ РїРѕСЃС‚СЂРѕРµРЅРЅРѕР№ РєР°СЂС‚РѕР№ Р»РёС†Р° РїРѕ РІС‹Р±СЂР°РЅРЅРѕР№ Р±СЂРѕРЅРё.</p>
+    <p class="muted-copy">Страница берёт кадр с камеры и сравнивает его с уже построенной картой лица по выбранной брони.</p>
 
     {% if error %}
     <div class="alert error">{{ error }}</div>
@@ -15,22 +15,22 @@
 
     {% if result %}
     <div class="panel inner-panel {% if result.match %}success-panel{% else %}warn-panel{% endif %}">
-        <strong>{% if result.match %}РЎРѕРІРїР°РґРµРЅРёРµ РЅР°Р№РґРµРЅРѕ{% else %}РЎРѕРІРїР°РґРµРЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ{% endif %}</strong>
-        <p>Р“РѕСЃС‚СЊ: {{ result.guest_name }}</p>
-        <p>Р‘СЂРѕРЅСЊ: {{ result.reservation_external_id }}</p>
+        <strong>{% if result.match %}Совпадение найдено{% else %}Совпадение не найдено{% endif %}</strong>
+        <p>Гость: {{ result.guest_name }}</p>
+        <p>Бронь: {{ result.reservation_external_id }}</p>
         <p>Distance: {{ result.distance }}</p>
         <p>Confidence: {{ result.confidence }}</p>
-        <p>РџРѕСЂРѕРі: {{ result.threshold }}</p>
-        <p>РљР°С‡РµСЃС‚РІРѕ СЃРѕС…СЂР°РЅС‘РЅРЅРѕР№ РєР°СЂС‚С‹: {{ result.stored_quality_score }}</p>
+        <p>Порог: {{ result.threshold }}</p>
+        <p>Качество сохранённой карты: {{ result.stored_quality_score }}</p>
         <p>Stored faces: {{ result.stored_faces_count }}</p>
-        <p>РљР°С‡РµСЃС‚РІРѕ С‚РµРєСѓС‰РµРіРѕ СЃРЅРёРјРєР°: {{ result.probe_quality_score }}</p>
+        <p>Качество текущего снимка: {{ result.probe_quality_score }}</p>
     </div>
     {% endif %}
 
     <form method="post" action="/face-test" class="stack-form" id="face-test-form">
-        <label for="reservation_external_id">РџСЂРѕС„РёР»СЊ РґР»СЏ СЃСЂР°РІРЅРµРЅРёСЏ</label>
+        <label for="reservation_external_id">Профиль для сравнения</label>
         <select id="reservation_external_id" name="reservation_external_id" class="input" required>
-            <option value="">Р’С‹Р±РµСЂРёС‚Рµ Р±СЂРѕРЅСЊ</option>
+            <option value="">Выберите бронь</option>
             {% for profile in profiles %}
             <option value="{{ profile.reservation_external_id }}" {% if form.reservation_external_id == profile.reservation_external_id %}selected{% endif %}>
                 {{ profile.guest_name }} | {{ profile.reservation_external_id }} | {{ profile.status }} | faces={{ profile.faces_count }}
@@ -38,7 +38,7 @@
             {% endfor %}
         </select>
 
-        <label for="camera-device">РљР°РјРµСЂР°</label>
+        <label for="camera-device">Камера</label>
         <select id="camera-device" class="input"></select>
 
         <div class="camera-shell">
@@ -49,9 +49,9 @@
         <input type="hidden" id="image_data" name="image_data" value="{{ form.image_data }}">
 
         <div class="inline-actions">
-            <button type="button" class="btn ghost" id="camera-start">Р’РєР»СЋС‡РёС‚СЊ РєР°РјРµСЂСѓ</button>
-            <button type="button" class="btn ghost" id="camera-capture">РЎРґРµР»Р°С‚СЊ СЃРЅРёРјРѕРє</button>
-            <button type="submit" class="btn">РЎСЂР°РІРЅРёС‚СЊ</button>
+            <button type="button" class="btn ghost" id="camera-start">Включить камеру</button>
+            <button type="button" class="btn ghost" id="camera-capture">Сделать снимок</button>
+            <button type="submit" class="btn">Сравнить</button>
         </div>
     </form>
 </section>
@@ -59,8 +59,8 @@
 <section class="panel">
     <div class="section-head">
         <div>
-            <p class="section-kicker">Р–РЈР РќРђР›</p>
-            <h2>РџРѕСЃР»РµРґРЅРёРµ 100 РїРѕРїС‹С‚РѕРє РїРѕ Р»РёС†Сѓ</h2>
+            <p class="section-kicker">Журнал</p>
+            <h2>Последние 100 попыток по лицу</h2>
         </div>
     </div>
     <div class="grant-grid">
@@ -70,89 +70,18 @@
                 <strong>{{ entry.result }}</strong>
                 <span class="pill">{{ entry.source }}</span>
             </div>
-            <span>РџСЂРёС‡РёРЅР°: {{ entry.reason }}</span>
-            <span>Р’СЂРµРјСЏ: {{ entry.created_at }}</span>
-            <span>Р“РѕСЃС‚СЊ: {{ entry.guest_name or "вЂ”" }}</span>
-            <span>Р‘СЂРѕРЅСЊ: {{ entry.reservation_external_id or "вЂ”" }}</span>
-            <span>Distance: {{ entry.distance if entry.distance is not none else "вЂ”" }}</span>
-            <span>Confidence: {{ entry.confidence if entry.confidence is not none else "вЂ”" }}</span>
-            <span>РџРѕСЂРѕРі: {{ entry.threshold if entry.threshold is not none else "вЂ”" }}</span>
-            <span>РљР°С‡РµСЃС‚РІРѕ live: {{ entry.probe_quality_score if entry.probe_quality_score is not none else "вЂ”" }}</span>
+            <span>Причина: {{ entry.reason }}</span>
+            <span>Время: {{ entry.created_at }}</span>
+            <span>Гость: {{ entry.guest_name or "—" }}</span>
+            <span>Бронь: {{ entry.reservation_external_id or "—" }}</span>
+            <span>Distance: {{ entry.distance if entry.distance is not none else "—" }}</span>
+            <span>Confidence: {{ entry.confidence if entry.confidence is not none else "—" }}</span>
+            <span>Порог: {{ entry.threshold if entry.threshold is not none else "—" }}</span>
+            <span>Качество live: {{ entry.probe_quality_score if entry.probe_quality_score is not none else "—" }}</span>
         </article>
         {% else %}
-        <div class="empty-card">РџРѕРєР° РЅРµС‚ РїРѕРїС‹С‚РѕРє СЃСЂР°РІРЅРµРЅРёСЏ.</div>
+        <div class="empty-card">Пока нет попыток сравнения.</div>
         {% endfor %}
     </div>
 </section>
-
-<script>
-(() => {
-    const video = document.getElementById("camera-stream");
-    const canvas = document.getElementById("camera-canvas");
-    const imageDataInput = document.getElementById("image_data");
-    const cameraSelect = document.getElementById("camera-device");
-    const startButton = document.getElementById("camera-start");
-    const captureButton = document.getElementById("camera-capture");
-    let stream = null;
-
-    async function loadCameras() {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const cameras = devices.filter((device) => device.kind === "videoinput");
-        cameraSelect.innerHTML = "";
-        cameras.forEach((camera, index) => {
-            const option = document.createElement("option");
-            option.value = camera.deviceId;
-            option.textContent = camera.label || `РљР°РјРµСЂР° ${index + 1}`;
-            cameraSelect.appendChild(option);
-        });
-    }
-
-    async function startCamera() {
-        if (stream) {
-            stream.getTracks().forEach((track) => track.stop());
-        }
-        const selectedDeviceId = cameraSelect.value;
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "user" },
-            audio: false
-        });
-        video.srcObject = stream;
-        video.classList.remove("hidden");
-        canvas.classList.add("hidden");
-    }
-
-    function captureFrame() {
-        if (!video.videoWidth || !video.videoHeight) {
-            alert("РЎРЅР°С‡Р°Р»Р° РІРєР»СЋС‡РёС‚Рµ РєР°РјРµСЂСѓ Рё РґРѕР¶РґРёС‚РµСЃСЊ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ.");
-            return;
-        }
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext("2d");
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        imageDataInput.value = canvas.toDataURL("image/jpeg", 0.92);
-        canvas.classList.remove("hidden");
-        video.classList.add("hidden");
-    }
-
-    startButton.addEventListener("click", async () => {
-        try {
-            await startCamera();
-        } catch (error) {
-            alert("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РґРѕСЃС‚СѓРї Рє РєР°РјРµСЂРµ: " + error);
-        }
-    });
-
-    captureButton.addEventListener("click", () => {
-        captureFrame();
-    });
-
-    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-        .then((permissionStream) => {
-            permissionStream.getTracks().forEach((track) => track.stop());
-            return loadCameras();
-        })
-        .catch(() => {});
-})();
-</script>
 {% endblock %}

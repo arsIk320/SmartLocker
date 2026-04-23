@@ -77,7 +77,8 @@ def get_travelline_grant_sync_service(
 
 def render(request: Request, template_name: str, context: dict):
     templates = get_templates()
-    return templates.TemplateResponse(request=request, name=template_name, context=context)
+    merged_context = {"user": get_current_user(request), **context}
+    return templates.TemplateResponse(request=request, name=template_name, context=merged_context)
 
 
 def form_state(**values: str) -> dict[str, str]:
@@ -97,6 +98,23 @@ def _build_public_news() -> list[dict[str, str]]:
         {
             "title": "Следующий этап",
             "text": "Усиливаем защиту данных, переносим критичные связи в БД и готовим API-контракт для замка на ESP8266 / Arduino Nano / ESP32-CAM.",
+        },
+    ]
+
+
+def _build_public_news() -> list[dict[str, str]]:
+    return [
+        {
+            "title": "Серверный контур запущен",
+            "text": "SmartLocker уже работает на отдельном сервере: backend отвечает на API-запросы, публичный сайт опубликован, а устройства получают данные из боевого окружения.",
+        },
+        {
+            "title": "Сайт адаптирован под телефоны",
+            "text": "Публичные страницы, формы входа и сервисные экраны переработаны под мобильный сценарий, чтобы интерфейс выглядел как продукт, а не как десктопная заготовка на маленьком экране.",
+        },
+        {
+            "title": "Контур плат упрощён",
+            "text": "Модель устройств обновлена: активация и provisioning больше не смешивают разные платы, а основной сценарий строится вокруг ESP32 и ESP32-CAM без устаревшего контура ESP8266.",
         },
     ]
 
@@ -172,10 +190,11 @@ async def news_page(request: Request):
 
 
 @router.get("/go")
-async def redirect_to_panel(request: Request):
+async def go_route(request: Request):
     user = get_current_user(request)
     if user is None:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+
     return RedirectResponse(
         url="/admin/dashboard" if user.role == "admin" else "/dashboard",
         status_code=status.HTTP_302_FOUND,
@@ -184,7 +203,19 @@ async def redirect_to_panel(request: Request):
 
 @router.get("/login")
 async def login_page(request: Request):
-    return render(request, "login.html", {"title": "Вход", "error": None, "form": form_state(email="", password="")})
+    user = get_current_user(request)
+    if user is not None:
+        return RedirectResponse(
+            url="/admin/dashboard" if user.role == "admin" else "/dashboard",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    last_email = request.cookies.get("smartlocker_last_login", "")
+    return render(
+        request,
+        "login.html",
+        {"title": "Вход", "error": None, "form": form_state(email=last_email, password="")},
+    )
 
 
 @router.post("/login")
@@ -208,15 +239,30 @@ async def login_submit(
         url="/admin/dashboard" if user.role == "admin" else "/dashboard",
         status_code=status.HTTP_302_FOUND,
     )
+
+    cookie_secure = settings.session_cookie_secure and request.url.scheme == "https"
+    cookie_max_age = settings.session_persist_days * 24 * 60 * 60
+
     response.set_cookie(
         key=settings.session_cookie_name,
         value=auth_service.create_session_token(user),
         httponly=True,
-        secure=settings.session_cookie_secure and request.url.scheme == "https",
+        secure=cookie_secure,
         samesite=settings.session_cookie_samesite,
-        max_age=settings.session_persist_days * 24 * 60 * 60,
-        expires=settings.session_persist_days * 24 * 60 * 60,
+        max_age=cookie_max_age,
+        expires=cookie_max_age,
     )
+
+    response.set_cookie(
+        key="smartlocker_last_login",
+        value=user.email,
+        httponly=False,
+        secure=cookie_secure,
+        samesite=settings.session_cookie_samesite,
+        max_age=cookie_max_age,
+        expires=cookie_max_age,
+    )
+
     return response
 
 

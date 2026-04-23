@@ -9,19 +9,20 @@
 <body class="public-body">
     <div class="public-shell">
         <header class="public-header">
-            <a class="public-brand" href="/">
-                <span class="brand-mark">SL</span>
-                <span>SmartLocker</span>
-            </a>
+            <div class="public-topbar">
+                <a class="public-brand" href="/">
+                    <span class="brand-mark">SL</span>
+                    <span>SmartLocker</span>
+                </a>
+                <div class="public-actions">
+                    <a class="btn ghost light" href="/login">Войти</a>
+                </div>
+            </div>
             <nav class="public-nav">
                 <a href="/about">О проекте</a>
                 <a href="/features">Возможности</a>
                 <a href="/news">Новости</a>
             </nav>
-            <div class="public-actions">
-                <a class="btn ghost light" href="/login">Войти</a>
-                <a class="btn primary" href="/register">Регистрация</a>
-            </div>
         </header>
         {% block content %}{% endblock %}
     </div>

@@ -33,29 +33,31 @@
             <h3>Пользователи системы</h3>
         </div>
     </div>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Имя</th>
-                <th>Email</th>
-                <th>Телефон</th>
-                <th>Роль</th>
-                <th>Подтверждён</th>
-                <th>Создан</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in users %}
-            <tr>
-                <td>{{ item.full_name }}</td>
-                <td>{{ item.email }}</td>
-                <td>{{ item.phone }}</td>
-                <td><span class="pill">{{ item.role }}</span></td>
-                <td>{{ item.is_verified }}</td>
-                <td>{{ item.created_at }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Email</th>
+                    <th>Телефон</th>
+                    <th>Роль</th>
+                    <th>Подтверждён</th>
+                    <th>Создан</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in users %}
+                <tr>
+                    <td>{{ item.full_name }}</td>
+                    <td>{{ item.email }}</td>
+                    <td>{{ item.phone }}</td>
+                    <td><span class="pill">{{ item.role }}</span></td>
+                    <td>{{ item.is_verified }}</td>
+                    <td>{{ item.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </section>
 {% endblock %}

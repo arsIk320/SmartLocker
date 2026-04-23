@@ -1,0 +1,168 @@
+TERMIUS ADMIN COMMANDS
+======================
+
+SERVER STATUS
+-------------
+Uptime:
+uptime
+
+Memory:
+free -h
+
+Disk usage:
+df -h
+
+Listening ports:
+sudo ss -ltnp
+
+Firewall status:
+sudo ufw status
+
+Service status:
+sudo systemctl status <service> --no-pager
+
+Restart service:
+sudo systemctl restart <service>
+
+Service logs:
+sudo journalctl -u <service> --no-pager | tail -n 100
+
+
+USERS
+-----
+All users:
+cut -d: -f1 /etc/passwd
+
+Users with shell:
+awk -F: '$7 ~ /(bash|sh|zsh)$/ {print $1}' /etc/passwd
+
+Logged in users:
+who
+w
+
+Create user:
+sudo adduser <user>
+
+Change password:
+sudo passwd <user>
+
+Lock user:
+sudo passwd -l <user>
+
+Unlock user:
+sudo passwd -u <user>
+
+Delete user:
+sudo deluser <user>
+
+Delete user with home:
+sudo deluser --remove-home <user>
+
+Add to sudo:
+sudo usermod -aG sudo <user>
+
+Remove from sudo:
+sudo deluser <user> sudo
+
+Check groups:
+id <user>
+groups <user>
+
+
+SSH
+---
+SSH service status:
+sudo systemctl status ssh --no-pager
+
+Check SSH listening ports:
+sudo ss -ltnp | grep sshd
+
+Validate SSH config:
+sudo sshd -t
+
+Restart SSH:
+sudo systemctl restart ssh
+
+Show important SSH settings:
+sudo grep -E 'PermitRootLogin|PasswordAuthentication|PubkeyAuthentication|KbdInteractiveAuthentication|MaxAuthTries|LoginGraceTime' /etc/ssh/sshd_config
+
+
+FAIL2BAN
+--------
+General status:
+sudo fail2ban-client status
+
+SSH jail status:
+sudo fail2ban-client status sshd
+
+Unban IP:
+sudo fail2ban-client set sshd unbanip <ip>
+
+Restart fail2ban:
+sudo systemctl restart fail2ban
+
+Fail2ban logs:
+sudo journalctl -u fail2ban --no-pager | tail -n 100
+
+
+DOCKER
+------
+Running containers:
+docker ps
+
+All containers:
+docker ps -a
+
+Container logs:
+docker logs --tail=100 <container>
+
+Container logs live:
+docker logs -f <container>
+
+Restart container:
+docker restart <container>
+
+Stop container:
+docker stop <container>
+
+Start container:
+docker start <container>
+
+
+STOLOVKA
+--------
+Go to project:
+cd /home/deploy/Stolovka/Stolovka
+
+Compose status:
+docker compose ps
+
+Compose logs:
+docker compose logs --tail=100
+
+Compose logs live:
+docker compose logs -f
+
+Rebuild and start:
+docker compose up -d --build
+
+Stop project:
+docker compose down
+
+Restart project:
+docker compose restart
+
+
+USEFUL
+------
+Top processes:
+top
+
+If htop is installed:
+htop
+
+Recent logins:
+last -a | head -n 20
+
+Boot errors:
+sudo journalctl -b -p err --no-pager | tail -n 100

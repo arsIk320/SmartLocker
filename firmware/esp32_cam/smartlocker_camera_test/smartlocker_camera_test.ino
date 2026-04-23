@@ -110,6 +110,7 @@ void ensureWebServerStarted();
 void beginWiFiConnect();
 void serviceWiFiConnection();
 bool ensureWiFiConnected(unsigned long timeoutMs = WIFI_CONNECT_TIMEOUT_MS);
+void resetWiFiStation();
 
 String buildVerifyUrl();
 bool parseUrl(const String &url, ParsedUrl &parsed);
@@ -408,6 +409,13 @@ void ensureWebServerStarted() {
   appendLog("HTTP server started on http://" + currentIpAddress() + "/");
 }
 
+void resetWiFiStation() {
+  WiFi.disconnect(true, false);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  delay(50);
+}
+
 void beginWiFiConnect() {
   if (g_config.wifiSsid[0] == '\0') {
     g_wifiConnected = false;
@@ -423,7 +431,7 @@ void beginWiFiConnect() {
     return;
   }
 
-  WiFi.mode(WIFI_STA);
+  resetWiFiStation();
   WiFi.begin(g_config.wifiSsid, g_config.wifiPassword);
   g_wifiConnectStartedAt = millis();
   g_lastWifiAttemptAt = millis();
@@ -454,6 +462,8 @@ void serviceWiFiConnection() {
   if (g_wifiConnectInProgress) {
     if (millis() - g_wifiConnectStartedAt >= WIFI_CONNECT_TIMEOUT_MS) {
       g_wifiConnectInProgress = false;
+      g_lastWifiAttemptAt = millis();
+      resetWiFiStation();
       reportStatus("Wi-Fi timeout");
     }
     return;
@@ -874,9 +884,10 @@ void handleProvision(JsonVariantConst payload) {
   g_config = updated;
   saveConfig();
 
-  WiFi.disconnect(false, false);
+  resetWiFiStation();
   g_wifiConnected = false;
   g_wifiConnectInProgress = false;
+  g_lastWifiAttemptAt = millis();
 
   StaticJsonDocument<384> doc;
   doc["ok"] = true;

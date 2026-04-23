@@ -4,7 +4,7 @@
     <div>
         <span class="eyebrow">Кабинет пользователя</span>
         <h2>{{ user.full_name }}</h2>
-        <p>Здесь собирается защищённая схема доступа: аккаунт TravelLine, объекты, двери и автоматические доступы для гостей по найденным броням.</p>
+        <p>Здесь собрана рабочая схема доступа: аккаунт TravelLine, объекты, двери и автоматическая выдача доступов для гостей по найденным броням.</p>
     </div>
     <a class="btn primary" href="/objects">Управлять объектами</a>
 </section>
@@ -26,7 +26,7 @@
     <article class="panel stat">
         <span class="stat-label">Дверей</span>
         <strong>{{ total_doors }}</strong>
-        <p>У каждой двери теперь есть стабильный уникальный идентификатор.</p>
+        <p>У каждой двери есть стабильный уникальный идентификатор и привязка к объекту.</p>
     </article>
     <article class="panel stat">
         <span class="stat-label">Броней</span>
@@ -83,7 +83,7 @@
         <div class="section-head">
             <div>
                 <span class="eyebrow">Объекты</span>
-                <h3>Схема Дом -> Дверь</h3>
+                <h3>Схема Дом → Дверь</h3>
             </div>
         </div>
         <div class="overview-list">
@@ -99,7 +99,7 @@
                 {% endfor %}
             </article>
             {% else %}
-            <div class="empty-card">У вас ещё нет объектов. Добавьте первый дом на странице «Объекты».</div>
+            <div class="empty-card">У вас ещё нет объектов. Добавьте первый дом на странице «Objects».</div>
             {% endfor %}
         </div>
     </article>
@@ -201,6 +201,7 @@
         {% endfor %}
     </div>
 </section>
+
 {% if travelline_connection %}
 <script>
 const travelLineSecretInput = document.querySelector('input[name="client_secret"]');

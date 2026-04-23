@@ -45,10 +45,10 @@ constexpr unsigned long QR_REFRESH_INTERVAL_MS = 30000;
 constexpr unsigned long QR_RETRY_INTERVAL_MS = 7000;
 constexpr unsigned long WIFI_RECONNECT_INTERVAL_MS = 5000;
 constexpr unsigned long LCD_MESSAGE_HOLD_MS = 2500;
-constexpr bool SCANNER_DEBUG_LOG = true;
+constexpr bool SCANNER_DEBUG_LOG = false;
 
 constexpr size_t LOG_CAPACITY = 32;
-constexpr uint16_t CONTROL_TASK_STACK = 4096;
+constexpr uint16_t CONTROL_TASK_STACK = 8192;
 constexpr UBaseType_t CONTROL_TASK_PRIORITY = 1;
 constexpr BaseType_t CONTROL_TASK_CORE = 0;
 
@@ -142,6 +142,7 @@ void beginWifiConnect();
 void serviceWifiConnection();
 bool fetchQrCodeFromServer();
 void ensureWebServerStarted();
+void resetWifiStation();
 void serviceSerialCommands();
 void handleIncomingLine(const String &line);
 void handlePlainCommand(const String &command);
@@ -438,16 +439,17 @@ bool copyRequiredString(JsonVariantConst source, char *target, size_t targetSize
   return true;
 }
 
-void setCachedQr(const String &code, const String &doorUid, const String &expiresAt) {
+void setCachedQr(const char *code, const char *doorUid, const char *expiresAt) {
   if (!takeMutex(g_stateMutex)) {
     return;
   }
 
-  strlcpy(g_cachedCode, code.c_str(), sizeof(g_cachedCode));
-  strlcpy(g_cachedDoorUid, doorUid.c_str(), sizeof(g_cachedDoorUid));
-  strlcpy(g_cachedExpiresAt, expiresAt.c_str(), sizeof(g_cachedExpiresAt));
-  g_cachedQrReady = code.length() > 0;
+  strlcpy(g_cachedCode, code ? code : "", sizeof(g_cachedCode));
+  strlcpy(g_cachedDoorUid, doorUid ? doorUid : "", sizeof(g_cachedDoorUid));
+  strlcpy(g_cachedExpiresAt, expiresAt ? expiresAt : "", sizeof(g_cachedExpiresAt));
+  g_cachedQrReady = g_cachedCode[0] != '\0';
   g_lastQrRefreshAt = millis();
+
   releaseMutex(g_stateMutex);
 }
 
@@ -545,9 +547,7 @@ void beginWifiConnect() {
     return;
   }
 
-  WiFi.disconnect(false, false);
-  delay(50);
-  WiFi.mode(WIFI_STA);
+  resetWifiStation();
   WiFi.begin(g_config.wifiSsid, g_config.wifiPassword);
   g_wifiConnectStartedAt = millis();
   g_lastWifiAttemptAt = millis();
@@ -555,6 +555,13 @@ void beginWifiConnect() {
   setWifiConnected(false);
   appendLog("Connecting to Wi-Fi SSID: " + String(g_config.wifiSsid));
   setLocalNetworkStatus("ESP: connect...");
+}
+
+void resetWifiStation() {
+  WiFi.disconnect(true, false);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  delay(50);
 }
 
 void serviceWifiConnection() {
@@ -581,6 +588,8 @@ void serviceWifiConnection() {
   if (g_wifiConnectInProgress) {
     if (millis() - g_wifiConnectStartedAt >= WIFI_CONNECT_TIMEOUT_MS) {
       g_wifiConnectInProgress = false;
+      g_lastWifiAttemptAt = millis();
+      resetWifiStation();
       appendLog("Wi-Fi connection timeout");
       setLocalNetworkStatus("ESP: timeout");
     }
@@ -701,10 +710,12 @@ void ensureWebServerStarted() {
 
 bool fetchQrCodeFromServer() {
   g_lastQrAttemptAt = millis();
+
   if (g_config.lockId[0] == '\0' || g_config.apiKey[0] == '\0' || g_config.apiBaseUrl[0] == '\0') {
     appendLog("QR refresh skipped: provisioning is incomplete");
     return false;
   }
+
   if (!isWifiConnected()) {
     appendLog("QR refresh skipped: Wi-Fi is not connected");
     return false;
@@ -717,71 +728,59 @@ bool fetchQrCodeFromServer() {
   }
 
   appendLog("Requesting current QR from " + url);
+
   int statusCode = -1;
   String payload;
-  HTTPClient *http = new HTTPClient();
-  if (http == nullptr) {
-    appendLog("HTTP client allocation failed");
-    return false;
-  }
-  http->setReuse(false);
+  payload.reserve(512);
 
   if (url.startsWith("https://")) {
-    WiFiClientSecure *client = new WiFiClientSecure();
-    if (client == nullptr) {
-      delete http;
-      appendLog("TLS client allocation failed");
-      return false;
-    }
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(HTTP_TIMEOUT_MS);
 
-    client->setInsecure();
-    client->setTimeout(HTTP_TIMEOUT_MS);
-    if (!http->begin(*client, url)) {
-      delete client;
-      delete http;
+    HTTPClient http;
+    http.setReuse(false);
+    http.setTimeout(HTTP_TIMEOUT_MS);
+
+    if (!http.begin(client, url)) {
       appendLog("HTTP begin failed (TLS)");
       return false;
     }
-    http->setTimeout(HTTP_TIMEOUT_MS);
-    http->addHeader("X-Lock-Id", g_config.lockId);
-    http->addHeader("X-Lock-Api-Key", g_config.apiKey);
-    statusCode = http->GET();
-    if (statusCode > 0) {
-      payload = http->getString();
-    }
-    http->end();
-    delete client;
-  } else {
-    WiFiClient *client = new WiFiClient();
-    if (client == nullptr) {
-      delete http;
-      appendLog("HTTP client allocation failed");
-      return false;
-    }
 
-    client->setTimeout(HTTP_TIMEOUT_MS);
-    if (!http->begin(*client, url)) {
-      delete client;
-      delete http;
+    http.addHeader("X-Lock-Id", g_config.lockId);
+    http.addHeader("X-Lock-Api-Key", g_config.apiKey);
+
+    statusCode = http.GET();
+    if (statusCode > 0) {
+      payload = http.getString();
+    }
+    http.end();
+  } else {
+    WiFiClient client;
+    client.setTimeout(HTTP_TIMEOUT_MS);
+
+    HTTPClient http;
+    http.setReuse(false);
+    http.setTimeout(HTTP_TIMEOUT_MS);
+
+    if (!http.begin(client, url)) {
       appendLog("HTTP begin failed");
       return false;
     }
-    http->setTimeout(HTTP_TIMEOUT_MS);
-    http->addHeader("X-Lock-Id", g_config.lockId);
-    http->addHeader("X-Lock-Api-Key", g_config.apiKey);
-    statusCode = http->GET();
+
+    http.addHeader("X-Lock-Id", g_config.lockId);
+    http.addHeader("X-Lock-Api-Key", g_config.apiKey);
+
+    statusCode = http.GET();
     if (statusCode > 0) {
-      payload = http->getString();
+      payload = http.getString();
     }
-    http->end();
-    delete client;
+    http.end();
   }
 
-  delete http;
-
   if (statusCode <= 0) {
-    appendLog(
-        "QR request failed with status " + String(statusCode) + " (" + HTTPClient::errorToString(statusCode) + ")");
+    appendLog("QR request failed with status " + String(statusCode) +
+              " (" + HTTPClient::errorToString(statusCode) + ")");
     return false;
   }
 
@@ -795,13 +794,14 @@ bool fetchQrCodeFromServer() {
   const char *code = g_qrResponseDoc["code"] | "";
   const char *doorUid = g_qrResponseDoc["door_uid"] | "";
   const char *expiresAt = g_qrResponseDoc["expires_at"] | "";
+
   if (code[0] == '\0') {
     appendLog("QR code not found in response");
     clearCachedQr();
     return false;
   }
 
-  setCachedQr(String(code), String(doorUid), String(expiresAt));
+  setCachedQr(code, doorUid, expiresAt);
 
   Serial.print("CODE:");
   Serial.println(code);
@@ -809,6 +809,7 @@ bool fetchQrCodeFromServer() {
   Serial.println(doorUid);
   Serial.print("EXPIRES_AT:");
   Serial.println(expiresAt);
+
   appendLog("QR cache updated");
   return true;
 }
@@ -1062,7 +1063,6 @@ void readFromAuxController() {
     if (ch == '\n' || ch == '\r') {
       if (g_auxBuffer.length() > 0) {
         g_auxBuffer.trim();
-        appendLog("Aux command: " + g_auxBuffer);
         handleAuxCommand(g_auxBuffer);
         g_auxBuffer = "";
       }
@@ -1227,9 +1227,9 @@ void serviceNetworkLoop() {
   serviceSerialCommands();
   serviceWifiConnection();
 
-  if (g_httpServerStarted) {
-    g_server.handleClient();
-  }
+  // if (g_httpServerStarted) {
+  //   g_server.handleClient();
+  // }
 
   if (isWifiConnected()) {
     String code;
@@ -1239,8 +1239,16 @@ void serviceNetworkLoop() {
     unsigned long lastRefreshAt = 0;
     const bool hasQr = snapshotCachedQr(code, doorUid, expiresAt, lastRefreshAt);
     const bool retryWindowElapsed = now - g_lastQrAttemptAt >= QR_RETRY_INTERVAL_MS;
-    if ((!hasQr && retryWindowElapsed) || (hasQr && now - lastRefreshAt >= QR_REFRESH_INTERVAL_MS)) {
-      fetchQrCodeFromServer();
+
+    const bool networkBusy =
+        g_cameraAwaitingResult ||
+        isLockActive() ||
+        (now - g_lastTriggerAt < 10000);
+
+    if (!networkBusy) {
+      if ((!hasQr && retryWindowElapsed) || (hasQr && now - lastRefreshAt >= QR_REFRESH_INTERVAL_MS)) {
+        fetchQrCodeFromServer();
+      }
     }
   }
 
