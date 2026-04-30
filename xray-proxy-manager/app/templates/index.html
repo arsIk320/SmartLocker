@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Xray Proxy Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Secure VLESS control plane</p>
+          <h1>Xray Proxy Manager</h1>
+          <p class="subtitle">Manage users, split tunneling domains, connection links, and service health from a local-only admin panel.</p>
+        </div>
+        <div class="status-card">
+          <h2>Service Status</h2>
+          <div id="status" class="status-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Users</p>
+            <h2>Proxy Access</h2>
+          </div>
+          <form id="user-form" class="inline-form">
+            <input id="user-name" name="name" type="text" placeholder="New user name" maxlength="128" required>
+            <button type="submit">Add user</button>
+          </form>
+        </div>
+        <div id="users" class="user-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Routing</p>
+            <h2>Split Tunneling Domains</h2>
+          </div>
+        </div>
+        <p class="hint">Traffic for these domains is matched by Xray routing rules. Everything else leaves directly through the server network stack.</p>
+        <textarea id="domains" rows="10" placeholder="one domain per line"></textarea>
+        <div class="actions">
+          <button id="save-domains" type="button">Save domains</button>
+        </div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+[Unit]
+Description=Xray Manager API
+After=network-online.target xray.service
+Wants=network-online.target
+Requires=xray.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/xray-manager
+EnvironmentFile=/etc/xray-manager.env
+ExecStart=/opt/xray-manager/.venv/bin/uvicorn app.main:app --host ${XRAY_MANAGER_UI_HOST} --port ${XRAY_MANAGER_UI_PORT}
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

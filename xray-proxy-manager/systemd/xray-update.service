@@ -1,0 +1,10 @@
+[Unit]
+Description=Update Xray from official GitHub release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/opt/xray-manager/scripts/xray_update.sh

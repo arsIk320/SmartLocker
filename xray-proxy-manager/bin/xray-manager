@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec /opt/xray-manager/.venv/bin/python -m cli.xray_manager "$@"
